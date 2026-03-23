@@ -1,0 +1,1162 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                          String              @id @default(uuid())
+  name                        String
+  email                       String              @unique
+  passwordHash                String
+  role                        UserRole
+  isActive                    Boolean             @default(true)
+  createdAt                   DateTime            @default(now())
+  updatedAt                   DateTime            @updatedAt
+  mustChangePassword          Boolean             @default(false)
+  isAdmin                     Boolean             @default(false)
+  /** Chaves dos tutoriais já concluídos pelo usuário (ex.: student-dashboard-tutorial-done). */
+  completedTutorialKeys      String[]            @default([])
+  auditLogs                   AuditLog[]          @relation("UserAuditLogs")
+  pendingSiteChangesRequested PendingSiteChange[]
+  pendingSiteChangesReviewed  PendingSiteChange[] @relation("PendingSiteChangeReviewedBy")
+  sentEmails                  SentEmail[]         @relation("SentEmailPerformedBy")
+  studentsDeleted             Student[]           @relation("StudentDeletedBy")
+  student                     Student?
+  studentAttachments          StudentAttachment[] @relation("StudentAttachmentUploadedBy")
+  teacher                     Teacher?
+  verificationTokens          VerificationToken[]
+  pendingTestimonialsReviewed PendingTestimonial[] @relation("PendingTestimonialReviewedBy")
+  lessonLastEdited            CourseLesson[]       @relation("LessonLastEditedBy")
+  supportTickets              SupportTicket[]
+  smsCampaignsCreated         SmsCampaign[]        @relation("SmsCampaignCreatedBy")
+  smsCampaignsConfirmed       SmsCampaign[]        @relation("SmsCampaignConfirmedBy")
+  smsCampaignsCanceled        SmsCampaign[]        @relation("SmsCampaignCanceledBy")
+  smsTemplatesCreated         SmsTemplate[]        @relation("SmsTemplateCreatedBy")
+  emailCampaignsCreated      EmailCampaign[]      @relation("EmailCampaignCreatedBy")
+  emailCampaignsConfirmed    EmailCampaign[]     @relation("EmailCampaignConfirmedBy")
+  emailCampaignsCanceled     EmailCampaign[]     @relation("EmailCampaignCanceledBy")
+  emailTemplatesCreated       EmailTemplate[]     @relation("EmailTemplateCreatedBy")
+  platformExperienceFeedbacks PlatformExperienceFeedback[]
+  reservations                Reservation[]
+}
+
+/// Pacote/lote do passeio (mesmo evento, condições comerciais distintas).
+model Package {
+  id                      String        @id @default(uuid())
+  name                    String
+  slug                    String        @unique
+  description             String?       @db.Text
+  shortDescription        String?
+  price                   Decimal       @db.Decimal(12, 2)
+  breakfastKitAvailable   Boolean       @default(false)
+  breakfastKitPrice       Decimal       @db.Decimal(12, 2) @default(0)
+  departureDate           DateTime      @db.Date
+  departureTime           String
+  boardingLocation        String
+  capacity                Int
+  status                  PackageStatus @default(OPEN)
+  coverImageUrl           String?
+  galleryImages           String[]      @default([])
+  isActive                Boolean       @default(true)
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+  reservations            Reservation[]
+
+  @@index([slug])
+  @@index([status, isActive])
+}
+
+/// Reserva com snapshot de valores (histórico independente de alterações no pacote).
+model Reservation {
+  id                            String            @id @default(uuid())
+  userId                        String
+  packageId                     String
+  customerNameSnapshot          String
+  customerEmailSnapshot         String
+  customerPhoneSnapshot         String
+  quantity                      Int
+  includesBreakfastKit          Boolean           @default(false)
+  unitPriceSnapshot             Decimal           @db.Decimal(12, 2)
+  breakfastKitUnitPriceSnapshot Decimal           @db.Decimal(12, 2)
+  totalPrice                    Decimal           @db.Decimal(12, 2)
+  status                        ReservationStatus @default(PENDING)
+  notes                         String?           @db.Text
+  reservedAt                    DateTime          @default(now())
+  confirmedAt                   DateTime?
+  createdAt                     DateTime          @default(now())
+  updatedAt                     DateTime          @updatedAt
+  user                          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  package                       Package           @relation(fields: [packageId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([packageId])
+  @@index([packageId, status])
+}
+
+enum PackageStatus {
+  DRAFT
+  OPEN
+  SOLD_OUT
+  CLOSED
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+/** Avaliação da experiência do aluno (plataforma, aulas, professor, comentário e indicação). */
+model PlatformExperienceFeedback {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /** Nota de 1 a 10 — plataforma (navegação, uso geral). */
+  ratingPlatform Int
+  /** Nota de 1 a 10 — aulas e conteúdo. */
+  ratingLessons  Int
+  /** Nota de 1 a 10 — atuação do(s) professor(es). */
+  ratingTeacher  Int
+  comment   String?  @db.Text
+  /** Texto livre: quem indicaria, contato, etc. */
+  referral  String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model SentEmail {
+  id                String   @id @default(uuid())
+  to                String
+  subject           String
+  messageId         String?
+  emailType         String
+  entityType        String?
+  entityId          String?
+  sentAt            DateTime @default(now())
+  performedByUserId String?
+  performedByUser   User?    @relation("SentEmailPerformedBy", fields: [performedByUserId], references: [id])
+}
+
+model VerificationToken {
+  id           String                @id @default(cuid())
+  userId       String
+  studentId    String?
+  enrollmentId String?
+  type         VerificationTokenType
+  tokenHash    String
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime              @default(now())
+  enrollment   Enrollment?           @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  student      Student?              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Teacher {
+  id          String       @id @default(uuid())
+  name        String
+  phone       String?
+  email       String?
+  photoUrl    String?
+  isActive    Boolean      @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  userId      String?      @unique
+  classGroups ClassGroup[]
+  user        User?        @relation(fields: [userId], references: [id])
+  lessonQuestionReplies LessonQuestionTeacherReply[]
+}
+
+model Course {
+  id             String                @id @default(uuid())
+  name           String                @unique
+  description    String?
+  workloadHours  Int?
+  status         CourseStatus          @default(ACTIVE)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  content        String?
+  imageUrl       String?
+  slug           String                @unique
+  classGroups    ClassGroup[]
+  modules        CourseModule[]
+  siteFormations SiteFormationCourse[]
+}
+
+model CourseModule {
+  id          String         @id @default(uuid())
+  courseId    String
+  title       String
+  description String?
+  order       Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  lessons     CourseLesson[]
+  course      Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, order])
+}
+
+model CourseLesson {
+  id              String                    @id @default(uuid())
+  moduleId        String
+  title           String
+  order           Int                       @default(0)
+  durationMinutes Int?
+  videoUrl        String?
+  imageUrls       String[]                  @default([])
+  contentRich     String?
+  /** Resumo rápido da aula: o que será aprendido (exibido no topo para o aluno). */
+  summary         String?
+  /** URL do PDF da aula (material complementar). */
+  pdfUrl          String?
+  /** URLs dos arquivos de apoio da aula (material complementar). */
+  attachmentUrls   String[]                  @default([])
+  /** Nomes exibidos para cada URL (mesmo índice que attachmentUrls). */
+  attachmentNames  String[]                  @default([])
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  /** Última edição: usuário que alterou o conteúdo (para auditoria pelo master). */
+  lastEditedByUserId String?
+  lastEditedAt       DateTime?
+  lastEditedByUser   User?                   @relation("LessonLastEditedBy", fields: [lastEditedByUserId], references: [id], onDelete: SetNull)
+  module          CourseModule              @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  classSessions   ClassSession[]
+  lessonProgress EnrollmentLessonProgress[]
+  lessonNotes     EnrollmentLessonNote[]
+  lessonFavorites EnrollmentLessonFavorite[]
+  lessonPassages  EnrollmentLessonPassage[]
+  exercises       CourseLessonExercise[]
+
+  @@unique([moduleId, order])
+}
+
+/** Exercício de múltipla escolha vinculado à aula. */
+model CourseLessonExercise {
+  id        String   @id @default(uuid())
+  lessonId  String
+  order     Int      @default(0)
+  question  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lesson    CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  options   CourseLessonExerciseOption[]
+  answers   EnrollmentLessonExerciseAnswer[]
+
+  @@index([lessonId])
+}
+
+/** Opção de resposta de um exercício de múltipla escolha. */
+model CourseLessonExerciseOption {
+  id         String   @id @default(uuid())
+  exerciseId String
+  order      Int      @default(0)
+  text       String
+  isCorrect  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  exercise   CourseLessonExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@index([exerciseId])
+}
+
+model ClassGroup {
+  id               String           @id @default(uuid())
+  courseId         String
+  teacherId        String
+  daysOfWeek       String[]
+  startTime        String
+  endTime          String
+  capacity         Int
+  status           ClassGroupStatus @default(PLANEJADA)
+  location         String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  endDate          DateTime?        @db.Date
+  startDate        DateTime         @db.Date
+  preventAutoClose Boolean          @default(false)
+  course           Course           @relation(fields: [courseId], references: [id])
+  teacher          Teacher          @relation(fields: [teacherId], references: [id])
+  sessions         ClassSession[]
+  enrollments      Enrollment[]
+}
+
+model ClassSession {
+  id                 String              @id @default(uuid())
+  classGroupId       String
+  lessonId           String?
+  sessionDate        DateTime            @db.Date
+  startTime          String
+  endTime            String
+  status             ClassSessionStatus  @default(SCHEDULED)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  classGroup         ClassGroup          @relation(fields: [classGroupId], references: [id])
+  lesson             CourseLesson?        @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  sessionAttendances SessionAttendance[]
+
+  @@unique([classGroupId, sessionDate])
+}
+
+/** Frequência do aluno em uma sessão de aula (professor marca presença). */
+model SessionAttendance {
+  id                   String       @id @default(uuid())
+  classSessionId       String
+  enrollmentId         String
+  present              Boolean      @default(false)
+  /** Justificativa informada pelo professor quando o aluno está ausente (opcional). */
+  absenceJustification String?      @db.Text
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  classSession   ClassSession @relation(fields: [classSessionId], references: [id], onDelete: Cascade)
+  enrollment     Enrollment   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([classSessionId, enrollmentId])
+  @@index([classSessionId])
+  @@index([enrollmentId])
+}
+
+model TimeSlot {
+  id        String   @id @default(uuid())
+  startTime String
+  endTime   String
+  name      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Holiday {
+  id        String   @id @default(uuid())
+  date      DateTime @db.Date
+  name      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  recurring Boolean  @default(false)
+}
+
+model AuditLog {
+  id                String   @id @default(uuid())
+  entityType        String
+  entityId          String
+  action            String
+  diffJson          String
+  performedByUserId String?
+  createdAt         DateTime @default(now())
+  performedByUser   User?    @relation("UserAuditLogs", fields: [performedByUserId], references: [id])
+}
+
+model Student {
+  id                    String              @id @default(uuid())
+  name                  String
+  birthDate             DateTime            @db.Date
+  cpf                   String              @unique
+  rg                    String
+  phone                 String
+  gender                Gender
+  hasDisability         Boolean             @default(false)
+  disabilityDescription String?
+  educationLevel        EducationLevel
+  isStudying            Boolean             @default(false)
+  studyShift            StudyShift?
+  guardianName          String?
+  guardianCpf           String?
+  guardianRg            String?
+  guardianPhone         String?
+  guardianRelationship  String?
+  deletedAt             DateTime?
+  deletedByUserId       String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  city                  String              @default("Belém")
+  complement            String?
+  neighborhood          String              @default("")
+  number                String              @default("")
+  state                 String              @default("PA")
+  street                String              @default("")
+  email                 String?
+  cep                   String?
+  userId                String?             @unique
+  enrollments           Enrollment[]
+  deletedByUser         User?               @relation("StudentDeletedBy", fields: [deletedByUserId], references: [id])
+  user                  User?               @relation(fields: [userId], references: [id])
+  attachments           StudentAttachment[]
+  verificationTokens    VerificationToken[]
+}
+
+model Enrollment {
+  id                    String                    @id @default(uuid())
+  studentId             String
+  classGroupId          String
+  enrolledAt            DateTime                  @default(now())
+  status                String                    @default("ACTIVE")
+  enrollmentConfirmedAt DateTime?
+  termsAcceptedAt       DateTime?
+  termsVersion          String?
+  confirmationMethod    String?
+  confirmedIp           String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  certificateUrl        String?
+  certificatePublicId   String?
+  certificateFileName   String?
+  isPreEnrollment       Boolean                   @default(false)
+  classGroup            ClassGroup                @relation(fields: [classGroupId], references: [id], onDelete: Cascade)
+  student               Student                   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  verificationTokens    VerificationToken[]
+  lessonProgress        EnrollmentLessonProgress[]
+  lessonNotes           EnrollmentLessonNote[]
+  lessonFavorites       EnrollmentLessonFavorite[]
+  lessonPassages        EnrollmentLessonPassage[]
+  lessonQuestions       EnrollmentLessonQuestion[]
+  questionReplies      EnrollmentLessonQuestionReply[]
+  exerciseAnswers       EnrollmentLessonExerciseAnswer[]
+  sessionAttendances   SessionAttendance[]
+}
+
+model EnrollmentLessonFavorite {
+  id           String       @id @default(uuid())
+  enrollmentId String
+  lessonId     String
+  createdAt    DateTime     @default(now())
+  enrollment   Enrollment   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson       CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+}
+
+model EnrollmentLessonNote {
+  id                  String       @id @default(uuid())
+  enrollmentId        String
+  lessonId           String
+  content            String
+  videoTimestampSecs Int?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  enrollment         Enrollment   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson             CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([enrollmentId, lessonId])
+}
+
+model EnrollmentLessonPassage {
+  id           String       @id @default(uuid())
+  enrollmentId String
+  lessonId     String
+  text         String       // trecho selecionado (como marca-texto)
+  startOffset  Int          // índice do caractere no texto plano do conteúdo (para localizar o trecho)
+  createdAt    DateTime     @default(now())
+  enrollment   Enrollment   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson       CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([enrollmentId, lessonId])
+}
+
+model EnrollmentLessonProgress {
+  id                  String     @id @default(uuid())
+  enrollmentId        String
+  lessonId            String
+  completed           Boolean    @default(false)
+  percentWatched      Int        @default(0)
+  percentRead         Int        @default(0)
+  completedAt         DateTime?
+  lastAccessedAt      DateTime?
+  totalMinutesStudied   Int        @default(0)
+  /** Último slide (índice 0-based) visualizado; null = não definido ou concluiu o último. */
+  lastContentPageIndex  Int?
+  updatedAt             DateTime   @updatedAt
+  enrollment            Enrollment   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson                CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+}
+
+/** Dúvida ou comentário do aluno sobre a aula (fórum por aula). */
+model EnrollmentLessonQuestion {
+  id           String    @id @default(uuid())
+  enrollmentId String
+  lessonId     String
+  content      String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  replies      EnrollmentLessonQuestionReply[]
+  teacherReplies LessonQuestionTeacherReply[]
+
+  @@index([enrollmentId, lessonId])
+  @@index([lessonId])
+}
+
+/** Resposta oficial do professor a uma dúvida na aula (gamificação + visibilidade para alunos). */
+model LessonQuestionTeacherReply {
+  id         String                   @id @default(uuid())
+  questionId String
+  teacherId  String
+  content    String
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+  question   EnrollmentLessonQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  teacher    Teacher                  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@index([teacherId])
+}
+
+/** Resposta de um aluno ao comentário/dúvida de outro (em "Dúvidas sobre esta aula"). */
+model EnrollmentLessonQuestionReply {
+  id           String   @id @default(uuid())
+  questionId   String
+  enrollmentId String
+  content      String
+  createdAt    DateTime @default(now())
+  question     EnrollmentLessonQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@index([enrollmentId])
+}
+
+/** Resposta do aluno a um exercício de múltipla escolha (várias tentativas por exercício; usa-se a mais recente para exibir). */
+model EnrollmentLessonExerciseAnswer {
+  id               String     @id @default(uuid())
+  enrollmentId     String
+  exerciseId       String
+  selectedOptionId String
+  correct          Boolean
+  createdAt        DateTime   @default(now())
+  enrollment       Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  exercise         CourseLessonExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@index([enrollmentId, exerciseId, createdAt])
+}
+
+model StudentAttachment {
+  id               String         @id @default(cuid())
+  studentId        String
+  type             AttachmentType
+  fileName         String?
+  mimeType         String?
+  sizeBytes        Int?
+  publicId         String
+  url              String
+  createdAt        DateTime       @default(now())
+  uploadedByUserId String?
+  deletedAt        DateTime?
+  student          Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  uploadedByUser   User?          @relation("StudentAttachmentUploadedBy", fields: [uploadedByUserId], references: [id])
+
+  @@index([studentId, type])
+}
+
+model SiteSettings {
+  id                    String   @id @default(uuid())
+  siteName              String?
+  logoUrl               String?
+  faviconUrl            String?
+  primaryColor          String?
+  secondaryColor        String?
+  contactEmail          String?
+  contactPhone          String?
+  contactWhatsapp       String?
+  businessHours         String?
+  socialInstagram       String?
+  socialFacebook        String?
+  socialYoutube         String?
+  socialLinkedin        String?
+  seoTitleDefault       String?
+  seoDescriptionDefault String?
+  /** Base URL do site (https://...) para placeholders {link}, {link_area_aluno} em e-mails quando APP_URL não está no .env */
+  publicAppUrl          String?
+  updatedAt             DateTime @updatedAt
+  addresses             Json?
+}
+
+model SiteAboutPage {
+  id        String   @id @default(uuid())
+  title     String?
+  subtitle  String?
+  content   String?
+  imageUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SiteMenuItem {
+  id         String         @id @default(uuid())
+  label      String
+  href       String
+  order      Int            @default(0)
+  parentId   String?
+  isExternal Boolean        @default(false)
+  isVisible  Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  parent     SiteMenuItem?  @relation("MenuItemsHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children   SiteMenuItem[] @relation("MenuItemsHierarchy")
+}
+
+model SiteBanner {
+  id        String   @id @default(uuid())
+  title     String?
+  subtitle  String?
+  ctaLabel  String?
+  ctaHref   String?
+  imageUrl  String?
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TabletBanner {
+  id        String   @id @default(uuid())
+  title     String?
+  subtitle  String?
+  imageUrl  String?
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SiteFormation {
+  id            String                @id @default(uuid())
+  title         String
+  slug          String                @unique
+  summary       String?
+  audience      String?
+  outcomes      String[]              @default([])
+  finalProject  String?
+  prerequisites String?
+  order         Int                   @default(0)
+  isActive      Boolean               @default(true)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  courses       SiteFormationCourse[]
+}
+
+model SiteFormationCourse {
+  formationId String
+  courseId    String
+  order       Int           @default(0)
+  course      Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  formation   SiteFormation @relation(fields: [formationId], references: [id], onDelete: Cascade)
+
+  @@id([formationId, courseId])
+}
+
+model SiteFormacoesPage {
+  id             String   @id @default(uuid())
+  title          String?
+  subtitle       String?
+  headerImageUrl String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model SiteInscrevaPage {
+  id             String   @id @default(uuid())
+  title          String?
+  subtitle       String?
+  headerImageUrl String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model SiteContatoPage {
+  id             String   @id @default(uuid())
+  title          String?
+  subtitle       String?
+  headerImageUrl String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model SiteProject {
+  id            String   @id @default(uuid())
+  title         String
+  slug          String   @unique
+  summary       String?
+  content       String?
+  coverImageUrl String?
+  galleryImages String[] @default([])
+  order         Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model SiteTestimonial {
+  id            String   @id @default(uuid())
+  name          String
+  roleOrContext String?
+  quote         String
+  photoUrl      String?
+  order         Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model PendingTestimonial {
+  id                String    @id @default(uuid())
+  name              String
+  roleOrContext     String?
+  quote             String
+  photoUrl          String?
+  status            String    @default("pending")
+  reviewedByUserId  String?
+  reviewedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  reviewedBy        User?     @relation("PendingTestimonialReviewedBy", fields: [reviewedByUserId], references: [id])
+}
+
+model SitePartner {
+  id         String   @id @default(uuid())
+  name       String
+  logoUrl    String?
+  websiteUrl String?
+  order      Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model ContactMessage {
+  id         String    @id @default(uuid())
+  name       String
+  email      String
+  phone      String
+  message    String
+  createdAt  DateTime  @default(now())
+  readAt     DateTime?
+  repliedAt  DateTime?
+}
+
+/** Chamado de suporte do aluno (área logada). */
+model SupportTicket {
+  id                String                 @id @default(uuid())
+  userId            String
+  protocolNumber    String                 @unique
+  subject           String
+  summary           String
+  status            SupportTicketStatus    @default(OPEN)
+  attachmentUrls    String[]               @default([])
+  attachmentNames   String[]               @default([])
+  /** Quando o aluno (dono) abriu o chamado pela última vez; usado para "não lido". */
+  studentLastReadAt DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages          SupportTicketMessage[]
+}
+
+/** Mensagem de um chamado (aluno ou suporte). */
+model SupportTicketMessage {
+  id           String        @id @default(uuid())
+  ticketId     String
+  authorUserId String
+  isFromSupport Boolean      @default(false)
+  content      String
+  createdAt    DateTime     @default(now())
+  ticket       SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+}
+
+enum SupportTicketStatus {
+  OPEN
+  ANSWERED
+  CLOSED
+}
+
+model SiteNewsCategory {
+  id       String         @id @default(uuid())
+  name     String
+  slug     String         @unique
+  order    Int            @default(0)
+  isActive Boolean        @default(true)
+  posts    SiteNewsPost[]
+}
+
+model SiteNewsPost {
+  id            String            @id @default(uuid())
+  title         String
+  slug          String            @unique
+  excerpt       String?
+  content       String?
+  coverImageUrl String?
+  categoryId    String?
+  publishedAt   DateTime?
+  isPublished   Boolean           @default(false)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  imageUrls     String[]          @default([])
+  category      SiteNewsCategory? @relation(fields: [categoryId], references: [id])
+}
+
+model SiteFaqItem {
+  id        String   @id @default(uuid())
+  question  String
+  answer    String
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SiteTransparencyCategory {
+  id        String                     @id @default(uuid())
+  name      String
+  slug      String                     @unique
+  order     Int                        @default(0)
+  isActive  Boolean                    @default(true)
+  documents SiteTransparencyDocument[]
+}
+
+model SiteTransparencyDocument {
+  id          String                   @id @default(uuid())
+  categoryId  String
+  title       String
+  description String?
+  date        DateTime?                @db.Date
+  fileUrl     String?
+  isActive    Boolean                  @default(true)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  category    SiteTransparencyCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
+model PendingSiteChange {
+  id                String    @id @default(uuid())
+  requestedByUserId String
+  entityType        String
+  action            String
+  entityId          String?
+  payload           Json
+  status            String    @default("pending")
+  reviewedByUserId  String?
+  reviewedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  requestedBy       User      @relation(fields: [requestedByUserId], references: [id], onDelete: Cascade)
+  reviewedBy        User?     @relation("PendingSiteChangeReviewedBy", fields: [reviewedByUserId], references: [id])
+}
+
+enum VerificationTokenType {
+  ENROLLMENT_CONFIRMATION
+  FIRST_ACCESS
+  PASSWORD_RESET
+}
+
+enum ClassSessionStatus {
+  SCHEDULED  // Agendada (data futura)
+  LIBERADA   // Liberada (data da aula já passou ou é hoje — aluno pode acessar conteúdo)
+  CANCELED   // Cancelada
+}
+
+enum UserRole {
+  MASTER
+  ADMIN
+  TEACHER
+  STUDENT
+  CUSTOMER
+}
+
+enum CourseStatus {
+  ACTIVE
+  INACTIVE
+  NOT_LISTED
+}
+
+enum ClassGroupStatus {
+  PLANEJADA
+  ABERTA
+  EM_ANDAMENTO
+  ENCERRADA
+  CANCELADA
+  INTERNO
+  EXTERNO
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_SAY
+}
+
+enum StudyShift {
+  MORNING
+  AFTERNOON
+  EVENING
+  FULL
+}
+
+enum EducationLevel {
+  NONE
+  ELEMENTARY_INCOMPLETE
+  ELEMENTARY_COMPLETE
+  HIGH_INCOMPLETE
+  HIGH_COMPLETE
+  COLLEGE_INCOMPLETE
+  COLLEGE_COMPLETE
+  OTHER
+}
+
+enum AttachmentType {
+  ID_DOCUMENT
+  ADDRESS_PROOF
+}
+
+// --- SMS Campaigns ---
+model SmsCampaign {
+  id                    String               @id @default(uuid())
+  name                  String
+  description           String?
+  audienceType          SmsAudienceType
+  audienceFilters       Json?
+  templateId            String?
+  messageContent        String?
+  messageCharCount      Int?
+  status                SmsCampaignStatus    @default(DRAFT)
+  totalFound            Int                  @default(0)
+  totalValid            Int                  @default(0)
+  totalMissingPhone     Int                  @default(0)
+  totalInvalidPhone     Int                  @default(0)
+  totalDuplicatesRemoved Int                  @default(0)
+  totalSent             Int                  @default(0)
+  totalDelivered        Int                  @default(0)
+  totalFailed           Int                  @default(0)
+  scheduledAt           DateTime?
+  startedAt             DateTime?
+  finishedAt            DateTime?
+  createdById           String
+  confirmedById         String?
+  canceledById          String?
+  canceledAt            DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  createdBy             User                 @relation("SmsCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  confirmedBy           User?                @relation("SmsCampaignConfirmedBy", fields: [confirmedById], references: [id], onDelete: SetNull)
+  canceledBy            User?                @relation("SmsCampaignCanceledBy", fields: [canceledById], references: [id], onDelete: SetNull)
+  template              SmsTemplate?         @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  recipients            SmsCampaignRecipient[]
+
+  @@index([status])
+  @@index([createdById])
+  @@index([scheduledAt])
+}
+
+model SmsCampaignRecipient {
+  id                 String            @id @default(uuid())
+  campaignId         String
+  recipientType      String
+  recipientId        String
+  recipientNameSnapshot String
+  phoneSnapshot     String
+  phoneNormalized   String
+  renderedMessage   String
+  providerName      String?
+  providerMessageId String?
+  providerResponse  Json?
+  status             SmsRecipientStatus @default(PENDING)
+  attempts           Int               @default(0)
+  errorMessage       String?
+  sentAt             DateTime?
+  deliveredAt       DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  campaign           SmsCampaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([campaignId, status])
+}
+
+model SmsTemplate {
+  id           String       @id @default(uuid())
+  name         String
+  description  String?
+  categoryHint String?
+  content      String
+  active       Boolean      @default(true)
+  createdById  String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  createdBy    User         @relation("SmsTemplateCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  campaigns    SmsCampaign[]
+
+  @@index([active])
+}
+
+enum SmsCampaignStatus {
+  DRAFT
+  SCHEDULED
+  PROCESSING
+  SENT
+  PARTIALLY_SENT
+  FAILED
+  CANCELED
+}
+
+enum SmsRecipientStatus {
+  PENDING
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  INVALID_PHONE
+  CANCELED
+}
+
+enum SmsAudienceType {
+  ALL_STUDENTS
+  CLASS_GROUP
+  STUDENTS_INCOMPLETE
+  STUDENTS_COMPLETE
+  STUDENTS_ACTIVE
+  STUDENTS_INACTIVE
+  BY_COURSE
+  TEACHERS
+  ADMINS
+  ALL_ACTIVE_USERS
+}
+
+// --- Email Campaigns ---
+model EmailCampaign {
+  id                     String                 @id @default(uuid())
+  name                   String
+  description            String?
+  audienceType           EmailAudienceType
+  audienceFilters        Json?
+  templateId             String?
+  subject                String?
+  htmlContent            String?                @db.Text
+  textContent            String?                @db.Text
+  status                 EmailCampaignStatus   @default(DRAFT)
+  totalFound             Int                    @default(0)
+  totalValid             Int                    @default(0)
+  totalMissingEmail      Int                    @default(0)
+  totalInvalidEmail      Int                    @default(0)
+  totalDuplicatesRemoved Int                    @default(0)
+  totalSent              Int                    @default(0)
+  totalDelivered         Int                    @default(0)
+  totalFailed            Int                    @default(0)
+  totalOpened            Int                    @default(0)
+  totalClicked           Int                    @default(0)
+  /** Rodadas de envio em massa (1ª execução, nova rodada após reenfileirar falhas, etc.). */
+  dispatchCount          Int                    @default(0)
+  scheduledAt            DateTime?
+  startedAt              DateTime?
+  finishedAt             DateTime?
+  createdById            String
+  confirmedById          String?
+  canceledById           String?
+  canceledAt             DateTime?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  createdBy              User                   @relation("EmailCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  confirmedBy            User?                  @relation("EmailCampaignConfirmedBy", fields: [confirmedById], references: [id], onDelete: SetNull)
+  canceledBy             User?                  @relation("EmailCampaignCanceledBy", fields: [canceledById], references: [id], onDelete: SetNull)
+  template               EmailTemplate?        @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  recipients             EmailCampaignRecipient[]
+
+  @@index([status])
+  @@index([createdById])
+  @@index([scheduledAt])
+}
+
+model EmailCampaignRecipient {
+  id                   String                  @id @default(uuid())
+  campaignId           String
+  recipientType        String
+  recipientId          String
+  recipientNameSnapshot String
+  emailSnapshot        String
+  emailNormalized      String
+  renderedSubject      String
+  renderedHtmlContent  String?                  @db.Text
+  renderedTextContent  String?                  @db.Text
+  providerName         String?
+  providerMessageId   String?
+  providerResponse     Json?
+  status               EmailRecipientStatus    @default(PENDING)
+  attempts             Int                     @default(0)
+  errorMessage         String?
+  sentAt               DateTime?
+  deliveredAt          DateTime?
+  openedAt             DateTime?
+  clickedAt            DateTime?
+  bouncedAt            DateTime?
+  complainedAt         DateTime?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  campaign             EmailCampaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([campaignId, status])
+}
+
+model EmailTemplate {
+  id             String          @id @default(uuid())
+  name           String
+  description    String?
+  categoryHint   String?
+  subjectTemplate String
+  htmlContent    String?         @db.Text
+  textContent    String?         @db.Text
+  active         Boolean        @default(true)
+  createdById    String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  createdBy      User           @relation("EmailTemplateCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  campaigns      EmailCampaign[]
+
+  @@index([active])
+}
+
+enum EmailCampaignStatus {
+  DRAFT
+  SCHEDULED
+  PROCESSING
+  SENT
+  PARTIALLY_SENT
+  FAILED
+  CANCELED
+}
+
+enum EmailRecipientStatus {
+  PENDING
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  INVALID_EMAIL
+  BOUNCED
+  COMPLAINED
+  OPENED
+  CLICKED
+  CANCELED
+}
+
+enum EmailAudienceType {
+  ALL_STUDENTS
+  ENROLLED_STUDENTS
+  CLASS_GROUP
+  STUDENTS_INCOMPLETE
+  STUDENTS_COMPLETE
+  STUDENTS_ACTIVE
+  STUDENTS_INACTIVE
+  BY_COURSE
+  SPECIFIC_STUDENTS
+  TEACHERS
+  ADMINS
+  ALL_ACTIVE_USERS
+  ALL_CUSTOMERS
+  CUSTOMERS_WITH_RESERVATIONS
+}
