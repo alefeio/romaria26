@@ -59,7 +59,7 @@ export default function SuportePage() {
             {isSupport ? "Atendimento aos chamados dos alunos." : "Acompanhe seus chamados ou abra um novo para entrar em contato com o suporte."}
           </p>
         </div>
-        {user.role === "STUDENT" && (
+        {user.role === "CUSTOMER" && (
           <Link
             href="/suporte/novo"
             className="inline-flex min-h-[44px] cursor-pointer items-center justify-center rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-zinc-800 hover:brightness-95 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 dark:hover:brightness-95"
@@ -78,7 +78,7 @@ export default function SuportePage() {
           <p className="text-sm text-[var(--text-muted)]">
             {isSupport ? "Nenhum chamado no momento." : "Você ainda não abriu nenhum chamado."}
           </p>
-          {user.role === "STUDENT" && (
+          {user.role === "CUSTOMER" && (
             <Link
               href="/suporte/novo"
               className="mt-3 inline-flex min-h-[44px] cursor-pointer items-center justify-center rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-zinc-800 hover:brightness-95 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 dark:hover:brightness-95"

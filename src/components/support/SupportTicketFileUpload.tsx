@@ -11,9 +11,7 @@ type Props = {
   multiple?: boolean;
 };
 
-/**
- * Upload de anexos para chamado de suporte (aluno). Usa /api/me/support/upload-signature.
- */
+/** Upload de anexos para chamado de suporte (aluno). */
 export function SupportTicketFileUpload({
   onUploaded,
   label = "Anexar arquivo",
@@ -22,38 +20,27 @@ export function SupportTicketFileUpload({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const uploadOne = useCallback(async (file: File): Promise<boolean> => {
-    const signRes = await fetch("/api/me/support/upload-signature", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-    });
-    const signJson = await signRes.json();
-    if (!signRes.ok || !signJson?.ok) return false;
-    const { timestamp, signature, apiKey, cloudName, folder } = signJson.data;
+  const uploadOne = useCallback(
+    async (file: File): Promise<boolean> => {
+      const formData = new FormData();
+      formData.append("file", file);
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("api_key", apiKey);
-    formData.append("timestamp", String(timestamp));
-    formData.append("signature", signature);
-    formData.append("folder", folder);
-
-    const isImage = file.type.startsWith("image/");
-    const endpoint = isImage
-      ? `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`
-      : `https://api.cloudinary.com/v1_1/${cloudName}/raw/upload`;
-
-    const uploadRes = await fetch(endpoint, { method: "POST", body: formData });
-    const uploadJson = (await uploadRes.json()) as { secure_url?: string; error?: { message?: string } };
-    if (!uploadRes.ok || uploadJson.error) return false;
-    const url = uploadJson.secure_url;
-    if (url) {
-      onUploaded(url, file.name);
+      const uploadRes = await fetch("/api/me/support/upload", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      const uploadJson = (await uploadRes.json()) as {
+        ok?: boolean;
+        data?: { url?: string };
+        error?: { message?: string };
+      };
+      if (!uploadRes.ok || !uploadJson.ok || !uploadJson.data?.url) return false;
+      onUploaded(uploadJson.data.url, file.name);
       return true;
-    }
-    return false;
-  }, [onUploaded]);
+    },
+    [onUploaded]
+  );
 
   const handleFile = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {

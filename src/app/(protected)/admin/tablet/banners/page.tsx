@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { CloudinaryImageUpload } from "@/components/admin/CloudinaryImageUpload";
+import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import { SortableTableDndWrapper, SortableTableRows } from "@/components/admin/SortableTableRows";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { Badge } from "@/components/ui/Badge";
@@ -247,7 +247,7 @@ export default function TabletBannersPage() {
             <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
               Imagem
             </label>
-            <CloudinaryImageUpload
+            <ImageUploadField
               kind="banners"
               currentUrl={imageUrl || undefined}
               onUploaded={setImageUrl}

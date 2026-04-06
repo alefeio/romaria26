@@ -15,13 +15,14 @@ export function ResponsiveShell({
     id: string;
     name: string;
     email: string;
-    role: "MASTER" | "ADMIN" | "TEACHER" | "STUDENT" | "CUSTOMER";
-    baseRole?: "MASTER" | "ADMIN" | "TEACHER" | "STUDENT" | "CUSTOMER";
+    role: "MASTER" | "ADMIN" | "CUSTOMER";
+    baseRole?: "MASTER" | "ADMIN" | "CUSTOMER";
     isAdmin?: boolean;
-    hasStudentProfile?: boolean;
-    hasTeacherProfile?: boolean;
-    /** Perfis disponíveis (calculado no servidor); quando presente, o select usa isso. */
-    availableRoles?: { canMaster: boolean; canStudent: boolean; canTeacher: boolean; canAdmin: boolean };
+    availableRoles?: {
+      canMaster: boolean;
+      canAdmin: boolean;
+      canCustomer?: boolean;
+    };
   };
   logoUrl?: string | null;
   children: React.ReactNode;

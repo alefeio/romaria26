@@ -1,11 +1,15 @@
+import type { Metadata } from "next";
 import { PageHeader, Section, Card } from "@/components/site";
-import { cloudinaryRawUrlForDownload } from "@/lib/cloudinary-url";
-import { getTransparencyForSite } from "@/lib/site-data";
+import { attachmentUrlForDownload } from "@/lib/attachment-download-url";
+import { getSiteSettings, getTransparencyForSite } from "@/lib/site-data";
 
-export const metadata = {
-  title: "Transparência | IGH",
-  description: "Editais, convênios e relatórios do IGH.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const s = await getSiteSettings();
+  const name = s?.siteName?.trim() || "Site";
+  const description = s?.seoDescriptionDefault?.trim() || `Editais, convênios e relatórios de ${name}.`;
+  const title = `Transparência | ${name}`;
+  return { title, description, openGraph: { title, description } };
+}
 
 function formatDate(d: Date | null): string {
   if (!d) return "";
@@ -46,7 +50,7 @@ export default async function TransparenciaPage() {
                       </div>
                       {doc.fileUrl && (
                         <a
-                          href={cloudinaryRawUrlForDownload(doc.fileUrl)}
+                          href={attachmentUrlForDownload(doc.fileUrl)}
                           download
                           target="_blank"
                           rel="noopener noreferrer"

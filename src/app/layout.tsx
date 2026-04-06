@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from "next";
+import { unstable_noStore as noStore } from "next/cache";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ToastProvider } from "@/components/feedback/ToastProvider";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { ThemeScript } from "@/components/theme/ThemeScript";
+import { getMetadataBase, siteIconsFromSettings } from "@/lib/site-metadata";
 import { getSiteSettings } from "@/lib/site-data";
 import "./globals.css";
 
@@ -20,28 +22,17 @@ const defaultTitle = "Painel";
 const defaultDescription = "Sistema de cadastro de cursos, turmas e professores.";
 
 export async function generateMetadata(): Promise<Metadata> {
+  noStore();
   const settings = await getSiteSettings();
   const title = settings?.seoTitleDefault ?? defaultTitle;
   const description = settings?.seoDescriptionDefault ?? defaultDescription;
-  const faviconUrl = settings?.faviconUrl?.trim() || undefined;
+  const metadataBase = getMetadataBase();
 
   return {
+    ...(metadataBase ? { metadataBase } : {}),
     title,
     description,
-    icons: faviconUrl
-      ? {
-          icon: [{ url: faviconUrl, type: "image/png" }, { url: faviconUrl, type: "image/x-icon" }],
-          shortcut: [faviconUrl],
-          apple: [faviconUrl],
-        }
-      : {
-          icon: [
-            { url: "/images/favicon.ico", type: "image/x-icon" },
-            { url: "/images/favicon.png", type: "image/png" },
-          ],
-          shortcut: ["/images/favicon.ico"],
-          apple: [{ url: "/images/favicon.png", type: "image/png" }],
-        },
+    icons: siteIconsFromSettings(settings),
   };
 }
 

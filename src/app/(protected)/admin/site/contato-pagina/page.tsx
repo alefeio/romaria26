@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { CloudinaryImageUpload } from "@/components/admin/CloudinaryImageUpload";
+import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import type { ApiErr, ApiResponse } from "@/lib/api-types";
 
 type ContatoPageItem = {
@@ -119,7 +119,7 @@ export default function ContatoPaginaPage() {
             placeholder="https://..."
           />
           <div className="mt-1">
-            <CloudinaryImageUpload
+            <ImageUploadField
               kind="contato"
               currentUrl={headerImageUrl || undefined}
               onUploaded={setHeaderImageUrl}

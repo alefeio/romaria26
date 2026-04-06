@@ -5,7 +5,7 @@ import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { CloudinaryImageUpload } from "@/components/admin/CloudinaryImageUpload";
+import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import type { ApiErr, ApiResponse } from "@/lib/api-types";
 
 type AboutItem = {
@@ -104,7 +104,7 @@ export default function SobrePage() {
       <form className="flex flex-col gap-4" onSubmit={save}>
         <div>
           <label className="text-sm font-medium">Título</label>
-          <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Sobre o IGH" />
+          <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Sobre nós" />
         </div>
         <div>
           <label className="text-sm font-medium">Subtítulo</label>
@@ -115,7 +115,7 @@ export default function SobrePage() {
           <p className="mt-0.5 text-xs text-[var(--text-muted)]">Imagem exibida na página Sobre do site. Cole a URL ou use o botão para enviar.</p>
           <Input className="mt-2" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
           <div className="mt-2">
-            <CloudinaryImageUpload kind="about" currentUrl={imageUrl || undefined} onUploaded={setImageUrl} label="Ou envie uma imagem" />
+            <ImageUploadField kind="about" currentUrl={imageUrl || undefined} onUploaded={setImageUrl} label="Ou envie uma imagem" />
           </div>
         </div>
         <div>

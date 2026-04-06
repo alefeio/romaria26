@@ -1,4 +1,4 @@
-export { statsImpact } from "./stats";
+export { awardsShowcase } from "./stats";
 export { parceiros } from "./parceiros";
 export { faqItems } from "./faq";
 export { depoimentos } from "./depoimentos";

@@ -1,11 +1,57 @@
 import "server-only";
 
+import { prisma } from "@/lib/prisma";
 import { getSessionUserFromCookie } from "@/lib/auth";
 import { jsonErr, jsonOk } from "@/lib/http";
 import {
   createReservationInTransaction,
   ReservationCreateError,
 } from "@/lib/reservations/create-reservation";
+
+export async function GET() {
+  const session = await getSessionUserFromCookie();
+  if (!session) {
+    return jsonErr("UNAUTHORIZED", "Não autorizado.", 401);
+  }
+
+  const rows = await prisma.reservation.findMany({
+    where: { userId: session.id },
+    orderBy: [{ reservedAt: "desc" }],
+    include: {
+      package: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          departureDate: true,
+          departureTime: true,
+          boardingLocation: true,
+        },
+      },
+    },
+  });
+
+  return jsonOk({
+    items: rows.map((r) => ({
+      id: r.id,
+      packageId: r.packageId,
+      customerNameSnapshot: r.customerNameSnapshot,
+      customerEmailSnapshot: r.customerEmailSnapshot,
+      customerPhoneSnapshot: r.customerPhoneSnapshot,
+      quantity: r.quantity,
+      includesBreakfastKit: r.includesBreakfastKit,
+      totalPrice: r.totalPrice.toString(),
+      status: r.status,
+      notes: r.notes,
+      reservedAt: r.reservedAt.toISOString(),
+      confirmedAt: r.confirmedAt?.toISOString() ?? null,
+      package: {
+        ...r.package,
+        departureDate: r.package.departureDate.toISOString().slice(0, 10),
+      },
+    })),
+  });
+}
 
 /**
  * Cria reserva para o usuário autenticado.

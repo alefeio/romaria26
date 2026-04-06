@@ -1,4 +1,6 @@
-import { normalizeDigits } from "@/lib/validators/students";
+function normalizeDigits(s: string): string {
+  return (s ?? "").replace(/\D/g, "");
+}
 
 const MIN_PHONE_DIGITS = 10;
 const MAX_PHONE_DIGITS = 11;

@@ -1,12 +1,15 @@
+import type { Metadata } from "next";
 import { PageHeader, NoticiasList } from "@/components/site";
 import type { PostForCard } from "@/components/site/NoticiasList";
-import { getNewsCategoriesForSite, getNewsPostsForSite } from "@/lib/site-data";
+import { getNewsCategoriesForSite, getNewsPostsForSite, getSiteSettings } from "@/lib/site-data";
 
-export const metadata = {
-  title: "Notícias | Instituto Gustavo Hessel",
-  description: "Acompanhe as novidades do IGH.",
-  openGraph: { title: "Notícias | IGH", description: "Acompanhe as novidades do IGH." },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const s = await getSiteSettings();
+  const name = s?.siteName?.trim() || "Site";
+  const description = s?.seoDescriptionDefault?.trim() || `Notícias e comunicados de ${name}.`;
+  const title = `Notícias | ${name}`;
+  return { title, description, openGraph: { title, description } };
+}
 
 function toPostForCard(p: {
   slug: string;
@@ -32,15 +35,17 @@ function toPostForCard(p: {
 }
 
 export default async function NoticiasPage() {
-  const [categories, posts] = await Promise.all([
+  const [settings, categories, posts] = await Promise.all([
+    getSiteSettings(),
     getNewsCategoriesForSite(),
     getNewsPostsForSite(),
   ]);
+  const siteName = settings?.siteName?.trim() || "Site";
   const postsForCard: PostForCard[] = posts.map(toPostForCard);
 
   return (
     <>
-      <PageHeader title="Notícias" subtitle="Acompanhe as novidades do IGH." />
+      <PageHeader title="Notícias" subtitle={`Acompanhe as novidades de ${siteName}.`} />
       <NoticiasList posts={postsForCard} categories={categories} />
     </>
   );

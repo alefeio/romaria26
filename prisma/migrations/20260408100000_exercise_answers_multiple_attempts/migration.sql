@@ -4,3 +4,5 @@ DROP INDEX IF EXISTS "EnrollmentLessonExerciseAnswer_enrollmentId_exerciseId_key
 ALTER TABLE "EnrollmentLessonExerciseAnswer" ADD CONSTRAINT "EnrollmentLessonExerciseAnswer_exerciseId_fkey" FOREIGN KEY ("exerciseId") REFERENCES "CourseLessonExercise"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 CREATE INDEX "EnrollmentLessonExerciseAnswer_enrollmentId_exerciseId_createdAt_idx" ON "EnrollmentLessonExerciseAnswer"("enrollmentId", "exerciseId", "createdAt");
+
+ALTER INDEX "EnrollmentLessonExerciseAnswer_enrollmentId_exerciseId_createdA" RENAME TO "EnrollmentLessonExerciseAnswer_enrollmentId_exerciseId_crea_idx";

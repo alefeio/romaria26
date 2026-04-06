@@ -5,11 +5,10 @@ import type { ComponentPropsWithoutRef, PropsWithChildren, ReactNode } from "rea
 export type DashboardRole = "student" | "teacher" | "admin";
 
 /** Role da sessão (UserProvider / layout) → gradiente do painel. */
-export type SessionPanelRole = "MASTER" | "ADMIN" | "TEACHER" | "STUDENT" | "CUSTOMER";
+export type SessionPanelRole = "MASTER" | "ADMIN" | "CUSTOMER";
 
 export function sessionRoleToDashboardRole(role: SessionPanelRole): DashboardRole {
-  if (role === "TEACHER") return "teacher";
-  if (role === "STUDENT" || role === "CUSTOMER") return "student";
+  if (role === "CUSTOMER") return "student";
   return "admin";
 }
 

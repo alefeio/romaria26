@@ -104,7 +104,7 @@ export async function POST(request: Request) {
   if (!user) {
     return jsonErr("UNAUTHORIZED", "Não autorizado.", 401);
   }
-  if (user.role !== "STUDENT") {
+  if (user.role !== "CUSTOMER") {
     return jsonErr("FORBIDDEN", "Apenas alunos podem abrir chamados de suporte.", 403);
   }
 

@@ -17,10 +17,6 @@ export type PendingChangeEntityType =
   | "site_faq_item"
   | "site_transparency_category"
   | "site_transparency_document"
-  | "site_formation"
-  | "site_formation_courses"
-  | "site_formacoes_page"
-  | "site_inscreva_page"
   | "site_contato_page";
 
 export async function createPendingSiteChange(
@@ -121,46 +117,6 @@ async function applyPendingChange(pending: {
             subtitle: (payload.subtitle as string) ?? null,
             content: (payload.content as string) ?? null,
             imageUrl: (payload.imageUrl as string) ?? null,
-          },
-        });
-      }
-      return;
-    }
-    case "site_formacoes_page": {
-      const data = {
-        title: payload.title ?? undefined,
-        subtitle: payload.subtitle ?? undefined,
-        headerImageUrl: payload.headerImageUrl ?? undefined,
-      };
-      const existing = await prisma.siteFormacoesPage.findFirst({ orderBy: { updatedAt: "desc" } });
-      if (existing) {
-        await prisma.siteFormacoesPage.update({ where: { id: existing.id }, data });
-      } else {
-        await prisma.siteFormacoesPage.create({
-          data: {
-            title: (payload.title as string) ?? null,
-            subtitle: (payload.subtitle as string) ?? null,
-            headerImageUrl: (payload.headerImageUrl as string) ?? null,
-          },
-        });
-      }
-      return;
-    }
-    case "site_inscreva_page": {
-      const data = {
-        title: payload.title ?? undefined,
-        subtitle: payload.subtitle ?? undefined,
-        headerImageUrl: payload.headerImageUrl ?? undefined,
-      };
-      const existing = await prisma.siteInscrevaPage.findFirst({ orderBy: { updatedAt: "desc" } });
-      if (existing) {
-        await prisma.siteInscrevaPage.update({ where: { id: existing.id }, data });
-      } else {
-        await prisma.siteInscrevaPage.create({
-          data: {
-            title: (payload.title as string) ?? null,
-            subtitle: (payload.subtitle as string) ?? null,
-            headerImageUrl: (payload.headerImageUrl as string) ?? null,
           },
         });
       }
@@ -450,54 +406,6 @@ async function applyPendingChange(pending: {
             isActive: payload.isActive ?? undefined,
           } as never,
         });
-      }
-      return;
-    case "site_formation":
-      if (action === "create") {
-        await prisma.siteFormation.create({
-          data: {
-            title: payload.title as string,
-            slug: payload.slug as string,
-            summary: (payload.summary as string) ?? null,
-            audience: (payload.audience as string) ?? null,
-            outcomes: (payload.outcomes as string[]) ?? [],
-            finalProject: (payload.finalProject as string) ?? null,
-            prerequisites: (payload.prerequisites as string) ?? null,
-            order: (payload.order as number) ?? 0,
-            isActive: payload.isActive !== false,
-          },
-        });
-      } else if (entityId) {
-        await prisma.siteFormation.update({
-          where: { id: entityId },
-          data: {
-            title: payload.title ?? undefined,
-            slug: payload.slug ?? undefined,
-            summary: payload.summary ?? undefined,
-            audience: payload.audience ?? undefined,
-            outcomes: payload.outcomes ?? undefined,
-            finalProject: payload.finalProject ?? undefined,
-            prerequisites: payload.prerequisites ?? undefined,
-            order: payload.order ?? undefined,
-            isActive: payload.isActive ?? undefined,
-          } as never,
-        });
-      }
-      return;
-    case "site_formation_courses":
-      if (action === "update" && entityId && Array.isArray(payload.courseIds)) {
-        const formationId = entityId;
-        await prisma.siteFormationCourse.deleteMany({ where: { formationId } });
-        const courseIds = payload.courseIds as string[];
-        if (courseIds.length > 0) {
-          await prisma.siteFormationCourse.createMany({
-            data: courseIds.map((courseId, i) => ({
-              formationId,
-              courseId,
-              order: i,
-            })),
-          });
-        }
       }
       return;
     case "site_menu":

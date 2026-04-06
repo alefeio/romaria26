@@ -6,7 +6,7 @@ export const setupSchema = z.object({
   password: z.string().min(8, "Senha deve ter no mínimo 8 caracteres"),
 });
 
-/** Aceita `login` ou (legado) `email` no corpo da requisição. */
+/** Login apenas por e-mail. Aceita `login` ou (legado) `email` no corpo. */
 export const loginSchema = z
   .object({
     login: z.string().optional(),
@@ -19,29 +19,21 @@ export const loginSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["login"],
-        message: "Informe e-mail ou CPF.",
+        message: "Informe o e-mail.",
       });
       return;
     }
     const lower = raw.toLowerCase();
     const isEmail = z.string().email().safeParse(lower).success;
-    const digits = raw.replace(/\D/g, "");
-    const isCpf = digits.length === 11;
-    if (!isEmail && !isCpf) {
+    if (!isEmail) {
       ctx.addIssue({
         code: "custom",
         path: ["login"],
-        message: "Informe um e-mail válido ou CPF com 11 dígitos.",
+        message: "Informe um e-mail válido.",
       });
     }
   })
   .transform((data) => {
-    const raw = (data.login ?? data.email ?? "").trim();
-    const lower = raw.toLowerCase();
-    const isEmail = z.string().email().safeParse(lower).success;
-    const digits = raw.replace(/\D/g, "");
-    if (isEmail) {
-      return { login: lower, password: data.password, kind: "email" as const };
-    }
-    return { login: digits, password: data.password, kind: "cpf" as const };
+    const raw = (data.login ?? data.email ?? "").trim().toLowerCase();
+    return { login: raw, password: data.password };
   });

@@ -30,58 +30,28 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Rotas apenas MASTER
-  if (["/users", "/teachers", "/class-groups", "/approvacoes", "/backup"].some((p) => pathname.startsWith(p))) {
+  const dashboardUrl = new URL("/dashboard", request.url);
+
+  if (pathname.startsWith("/users")) {
     if (role !== "MASTER") {
-      const dashboardUrl = new URL("/dashboard", request.url);
       return NextResponse.redirect(dashboardUrl);
     }
   }
 
-  // Cursos: MASTER ou TEACHER (professor vê apenas os cursos que leciona)
-  if (pathname.startsWith("/courses")) {
-    if (role !== "MASTER" && role !== "TEACHER") {
-      const dashboardUrl = new URL("/dashboard", request.url);
-      return NextResponse.redirect(dashboardUrl);
-    }
-  }
-
-  // Matrículas: MASTER, ADMIN ou TEACHER (professor vê apenas as turmas que leciona)
-  if (pathname.startsWith("/enrollments")) {
-    if (role !== "MASTER" && role !== "ADMIN" && role !== "TEACHER") {
-      const dashboardUrl = new URL("/dashboard", request.url);
-      return NextResponse.redirect(dashboardUrl);
-    }
-  }
-
-  // Alunos: MASTER, ADMIN ou TEACHER (professor vê apenas seus alunos)
-  if (pathname.startsWith("/students")) {
-    if (role !== "MASTER" && role !== "ADMIN" && role !== "TEACHER") {
-      const dashboardUrl = new URL("/dashboard", request.url);
-      return NextResponse.redirect(dashboardUrl);
-    }
-  }
-
-  // Rotas apenas STUDENT (minhas turmas)
-  if (pathname.startsWith("/minhas-turmas")) {
-    if (role !== "STUDENT") {
-      const dashboardUrl = new URL("/dashboard", request.url);
-      return NextResponse.redirect(dashboardUrl);
-    }
-  }
-
-  // Rotas CMS Site (apenas ADMIN e MASTER)
-  if (pathname.startsWith("/admin/site")) {
+  if (pathname.startsWith("/admin/site") || pathname.startsWith("/admin/sms") || pathname.startsWith("/admin/email")) {
     if (role !== "MASTER" && role !== "ADMIN") {
-      const dashboardUrl = new URL("/dashboard", request.url);
       return NextResponse.redirect(dashboardUrl);
     }
   }
 
-  // Campanhas SMS (apenas ADMIN e MASTER)
-  if (pathname.startsWith("/admin/sms")) {
+  if (pathname.startsWith("/admin/pacotes") || pathname.startsWith("/admin/reservas") || pathname.startsWith("/admin/tablet")) {
     if (role !== "MASTER" && role !== "ADMIN") {
-      const dashboardUrl = new URL("/dashboard", request.url);
+      return NextResponse.redirect(dashboardUrl);
+    }
+  }
+
+  if (pathname.startsWith("/cliente")) {
+    if (role !== "CUSTOMER") {
       return NextResponse.redirect(dashboardUrl);
     }
   }
@@ -93,22 +63,16 @@ export const config = {
   matcher: [
     "/dashboard/:path*",
     "/users/:path*",
-    "/teachers/:path*",
-    "/courses/:path*",
-    "/class-groups/:path*",
-    "/enrollments/:path*",
-    "/students/:path*",
-    "/minhas-turmas/:path*",
-    "/admin/site/:path*",
-    "/approvacoes/:path*",
-    "/backup/:path*",
     "/meus-dados/:path*",
     "/trocar-senha/:path*",
     "/escolher-perfil/:path*",
-    "/holidays/:path*",
-    "/time-slots/:path*",
-    "/professor/:path*",
     "/suporte/:path*",
+    "/admin/site/:path*",
     "/admin/sms/:path*",
+    "/admin/email/:path*",
+    "/admin/pacotes/:path*",
+    "/admin/reservas/:path*",
+    "/admin/tablet/:path*",
+    "/cliente/:path*",
   ],
 };

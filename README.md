@@ -9,7 +9,7 @@ Sistema web em **Next.js (App Router) + TypeScript + Prisma + PostgreSQL (Vercel
 - **Geração automática de aulas de Turma** até completar a **carga horária do curso** (ex.: 20h), a partir da data de início + dias da semana; **não gera aula em feriados** cadastrados
 - **Auditoria mínima** (`AuditLog`) para criação/edição/inativação, criação de Admin, geração de sessões, exclusão/inativação de curso, reativação de professor, edição/desativação de admin
 
-- **Alunos**: CRUD (ADMIN e MASTER); apenas MASTER pode excluir (soft delete) e reativar. **Anexos** (documento RG/CPF/CNH e comprovante de endereço) via **Cloudinary** (upload assinado; nunca expor API secret no frontend).
+- **Alunos**: CRUD (ADMIN e MASTER); apenas MASTER pode excluir (soft delete) e reativar. **Anexos** (documento RG/CPF/CNH e comprovante de endereço) via **API de upload (APIMG)** no servidor (a chave não vai ao browser).
 
 ---
 
@@ -45,11 +45,10 @@ cp .env.example .env
 
 - **`DATABASE_URL`** (ou **`POSTGRES_URL`**): string de conexão do Postgres. Use **`sslmode=verify-full`** na URL para evitar aviso de segurança do driver `pg` (em vez de `require`).
 - **`AUTH_SECRET`**: segredo forte (em produção é obrigatório).
-- **Cloudinary** (para anexos do aluno): crie conta em [cloudinary.com](https://cloudinary.com) (plano gratuito) e preencha:
-  - **`CLOUDINARY_CLOUD_NAME`**
-  - **`CLOUDINARY_API_KEY`**
-  - **`CLOUDINARY_API_SECRET`** (nunca expor no frontend)
-  - **`CLOUDINARY_UPLOAD_FOLDER`** (opcional; padrão: `igh/students`)
+- **Upload (APIMG)** — imagens e arquivos do site, anexos de alunos, suporte, certificados:
+  - **`APIMG_UPLOAD_URL`**: endpoint POST (multipart, campo `file`) que devolve JSON com URL pública
+  - **`APIMG_API_KEY`**: chave enviada no servidor como `Authorization: Bearer …` (ou `APIMG_AUTH_MODE=x-api-key` para cabeçalho `X-API-Key`)
+  - **`APIMG_UPLOAD_FOLDER`** (opcional): prefixo lógico enviado como `folder` no formulário
 - **E-mail (Resend)** – boas-vindas e confirmação de inscrição do aluno:
   - **`RESEND_API_KEY`**: API Key em [resend.com](https://resend.com) (free tier)
   - **`APP_URL`**: URL base do app (ex.: `http://localhost:3000` ou `https://seu-dominio.vercel.app`) para links nos e-mails
@@ -61,10 +60,9 @@ Exemplo:
 DATABASE_URL="postgresql://user:password@localhost:5432/cadastro_cursos?schema=public"
 AUTH_SECRET="coloque-um-segredo-forte-aqui"
 
-CLOUDINARY_CLOUD_NAME=seu_cloud_name
-CLOUDINARY_API_KEY=sua_api_key
-CLOUDINARY_API_SECRET=sua_api_secret
-CLOUDINARY_UPLOAD_FOLDER=igh/students
+APIMG_UPLOAD_URL=https://sua-api.com/upload
+APIMG_API_KEY=sua_chave
+# APIMG_UPLOAD_FOLDER=igh/students
 ```
 
 Para gerar `AUTH_SECRET`:
@@ -113,7 +111,7 @@ Acesse `http://localhost:3000`.
 - **`/courses`**: CRUD (somente MASTER) com status; excluir (hard delete se sem turmas, inativar se tiver turmas)
 - **`/class-groups`**: CRUD (somente MASTER) com vínculo curso/professor; aulas geradas por carga horária do curso
 - **`/holidays`**: CRUD de feriados (somente MASTER); datas em que não são geradas aulas
-- **`/students`**: CRUD de alunos (ADMIN e MASTER); anexos (documento e comprovante de endereço) via Cloudinary; apenas MASTER pode excluir aluno ou remover anexo
+- **`/students`**: CRUD de alunos (ADMIN e MASTER); anexos (documento e comprovante de endereço) via upload no servidor (APIMG); apenas MASTER pode excluir aluno ou remover anexo
 - **`/enrollments`**: Matrículas (MASTER); ao matricular aluno em uma turma, envia e-mail de boas-vindas com link de confirmação e senha temporária
 - **`/confirmar-inscricao`**: Página pública; o aluno acessa pelo link do e-mail, aceita os termos e confirma a inscrição
 - **`/trocar-senha`**: Troca de senha obrigatória no primeiro acesso (senha temporária)
@@ -145,12 +143,12 @@ Acesse `http://localhost:3000`.
 - Feriados **ativos** são considerados na geração de aulas (nenhuma aula é criada nessas datas).
 - É possível **inativar** um feriado (sem excluir) ou **excluir** definitivamente.
 
-### Anexos do aluno (Cloudinary)
+### Anexos do aluno (upload APIMG)
 
 - No cadastro do aluno (ao **editar**), a seção **Anexos** permite enviar **Documento (RG/CPF/CNH)** e **Comprovante de endereço**.
-- Formatos: PDF, JPG, PNG. Tamanho máximo: 5MB. Upload é feito com assinatura gerada no backend; a API secret do Cloudinary nunca é exposta no frontend.
+- Formatos: PDF, JPG, PNG. Tamanho máximo: 5MB. O arquivo vai para `POST /api/...` no Next.js, que repassa à API configurada em `APIMG_UPLOAD_URL` com a chave no servidor.
 - Apenas um arquivo ativo por tipo; ao enviar outro, o anterior é marcado como removido (soft delete). Apenas MASTER pode remover anexos.
-- Para testar: configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` (e opcionalmente `CLOUDINARY_UPLOAD_FOLDER`) no `.env`.
+- Para testar: configure `APIMG_UPLOAD_URL` e `APIMG_API_KEY` no `.env`.
 
 ### Como funciona a geração de aulas (turmas)
 

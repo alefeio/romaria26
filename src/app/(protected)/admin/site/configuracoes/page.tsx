@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CloudinaryImageUpload } from "@/components/admin/CloudinaryImageUpload";
+import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -204,7 +204,7 @@ export default function ConfiguracoesPage() {
                 onChange={(e) => setForm((f) => ({ ...f, logoUrl: e.target.value }))}
                 placeholder="https://..."
               />
-              <CloudinaryImageUpload
+              <ImageUploadField
                 kind="logo"
                 currentUrl={form.logoUrl || undefined}
                 onUploaded={(url) => setForm((f) => ({ ...f, logoUrl: url }))}
@@ -219,7 +219,7 @@ export default function ConfiguracoesPage() {
                 onChange={(e) => setForm((f) => ({ ...f, faviconUrl: e.target.value }))}
                 placeholder="https://..."
               />
-              <CloudinaryImageUpload
+              <ImageUploadField
                 kind="favicon"
                 currentUrl={form.faviconUrl || undefined}
                 onUploaded={(url) => setForm((f) => ({ ...f, faviconUrl: url }))}

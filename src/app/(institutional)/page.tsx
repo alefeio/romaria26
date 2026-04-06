@@ -1,53 +1,54 @@
+import type { Metadata } from "next";
 import {
   Container,
   Section,
   Button,
-  Card,
-  Stats,
+  AwardsShowcase,
   Testimonials,
   CTASection,
   FAQ,
   BlogCard,
-  FormacoesSection,
   HeroBannerCarousel,
 } from "@/components/site";
-import { statsImpact } from "@/content";
+import { awardsShowcase } from "@/content";
 import {
-  getFormationsForFilter,
-  getCoursesForSite,
   getBanners,
   getPartners,
   getFaqItems,
   getTestimonials,
   getNewsPostsForSite,
+  getPackagesForPublicSite,
+  getSiteSettings,
 } from "@/lib/site-data";
+import { PackageCard } from "@/components/site/PackageCard";
 
-export const metadata = {
-  title: "Instituto Gustavo Hessel | Formação em tecnologia e inclusão digital",
-  description:
-    "Formações gratuitas em programação, dados, UX/UI e mais. Inclusão digital e recondicionamento de computadores.",
-  openGraph: {
-    title: "Instituto Gustavo Hessel | Formação em tecnologia e inclusão digital",
-    description:
-      "Formações gratuitas em programação, dados, UX/UI e mais. Inclusão digital e recondicionamento de computadores.",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettings();
+  const name = settings?.siteName?.trim() || "Site";
+  const title = settings?.seoTitleDefault?.trim() || `${name} | Início`;
+  const description =
+    settings?.seoDescriptionDefault?.trim() ||
+    "Passeios, projetos e notícias. Reserve online e acompanhe nossas ações.";
+  return {
+    title,
+    description,
+    openGraph: { title, description },
+  };
+}
 
-type Props = { searchParams: Promise<{ formacao?: string }> };
-
-export default async function HomePage({ searchParams }: Props) {
-  const { formacao: formacaoSlug } = await searchParams;
-
-  const [formations, coursesFull, banners, partners, faqItemsFromDb, testimonialsFromDb, newsPosts] =
+export default async function HomePage() {
+  const [settings, banners, partners, faqItemsFromDb, testimonialsFromDb, newsPosts, packagesPublic] =
     await Promise.all([
-      getFormationsForFilter(),
-      getCoursesForSite(formacaoSlug),
+      getSiteSettings(),
       getBanners(),
       getPartners(),
       getFaqItems(),
       getTestimonials(),
       getNewsPostsForSite(),
+      getPackagesForPublicSite(),
     ]);
+
+  const siteName = settings?.siteName?.trim() || "Site";
 
   const recentPosts = newsPosts.slice(0, 4).map((p) => {
     let date = "";
@@ -65,8 +66,6 @@ export default async function HomePage({ searchParams }: Props) {
     };
   });
 
-  const courses = coursesFull;
-
   const faqItems = faqItemsFromDb.map((i) => ({ pergunta: i.question, resposta: i.answer }));
   const depoimentos = testimonialsFromDb.map((t) => ({
     nome: t.name,
@@ -77,7 +76,6 @@ export default async function HomePage({ searchParams }: Props) {
 
   return (
     <>
-      {/* Hero / Carrossel de banners */}
       {banners.length > 0 ? (
         <HeroBannerCarousel banners={banners} />
       ) : (
@@ -85,20 +83,18 @@ export default async function HomePage({ searchParams }: Props) {
           <Container>
             <div className="mx-auto max-w-3xl text-center">
               <h1 className="text-3xl font-bold tracking-tight text-[var(--igh-secondary)] sm:text-4xl lg:text-5xl">
-                Formação em tecnologia que transforma vidas
+                {siteName}
               </h1>
               <p className="mt-4 text-lg text-[var(--igh-muted)]">
-                Cursos gratuitos em programação, dados, UX/UI e marketing digital. Pré-requisito: Informática Básica.
+                {settings?.seoDescriptionDefault?.trim() ||
+                  "Conheça nossos passeios, projetos e formas de participar."}
               </p>
               <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-                <Button as="link" href="/formacoes" variant="primary" size="lg">
-                  Ver formações
+                <Button as="link" href="/passeios" variant="primary" size="lg">
+                  Ver passeios
                 </Button>
-                <Button as="link" href="/contato#inscreva" variant="secondary" size="lg">
-                  Inscrever-se
-                </Button>
-                <Button as="link" href="/projetos/doacoes-recebidas" variant="accent" size="lg">
-                  Doe equipamentos
+                <Button as="link" href="/contato" variant="secondary" size="lg">
+                  Fale conosco
                 </Button>
               </div>
             </div>
@@ -106,73 +102,39 @@ export default async function HomePage({ searchParams }: Props) {
         </section>
       )}
 
-      {/* Prova de impacto */}
-      <Stats items={statsImpact} />
+      <AwardsShowcase heading={awardsShowcase.heading} awards={awardsShowcase.awards} />
 
-      {/* Formações e Cursos */}
-      <Section
-        title="Formações e Cursos"
-        subtitle="Trilhas técnicas com projeto integrador e foco em carreira."
-      >
-        <FormacoesSection
-          formations={formations}
-          courses={courses}
-          formacaoSlug={formacaoSlug}
-          basePath="/"
-        />
-        <div className="mt-8 text-center">
-          <Button as="link" href="/inscreva" variant="primary" size="lg">
-            Quero me inscrever
-          </Button>
-        </div>
-      </Section>
+      {packagesPublic.length > 0 ? (
+        <Section
+          title="Há mais de 20 anos navegando com Maria"
+          subtitle="Permita que a Romaria Fluvial Muiraquitã proporcione uma experiência inesquecível para você e sua família."
+        >
+          <ul className="grid list-none gap-8 pl-0 sm:grid-cols-2 lg:grid-cols-3">
+            {packagesPublic.slice(0, 6).map((p) => (
+              <li key={p.id}>
+                <PackageCard
+                  name={p.name}
+                  slug={p.slug}
+                  shortDescription={p.shortDescription}
+                  price={p.price}
+                  departureDate={p.departureDate}
+                  departureTime={p.departureTime}
+                  boardingLocation={p.boardingLocation}
+                  coverImageUrl={p.coverImageUrl}
+                  remainingPlaces={p.remainingPlaces}
+                />
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
 
-      {/* Projetos e sustentabilidade */}
-      <Section
-        title="Projetos e sustentabilidade"
-        subtitle="CRC e Computadores para Inclusão: recondicionamento e doação de equipamentos."
-        background="muted"
-      >
-        <div className="grid gap-6 sm:grid-cols-2">
-          <Card as="article">
-            <h3 className="text-lg font-semibold text-[var(--igh-secondary)]">CRC</h3>
-            <p className="mt-2 text-sm text-[var(--igh-muted)]">
-              Centros de Recondicionamento de Computadores onde equipamentos são triados, recondicionados e destinados a projetos de inclusão digital.
-            </p>
-            <Button as="link" href="/projetos/crc" variant="primary" size="sm" className="mt-4">
-              Conhecer o CRC
-            </Button>
-          </Card>
-          <Card as="article">
-            <h3 className="text-lg font-semibold text-[var(--igh-secondary)]">Computadores para Inclusão</h3>
-            <p className="mt-2 text-sm text-[var(--igh-muted)]">
-              Programa que recebe doações de equipamentos, recondiciona e doa a escolas, telecentros e iniciativas de inclusão.
-            </p>
-            <Button as="link" href="/projetos/computadores-para-inclusao" variant="primary" size="sm" className="mt-4">
-              Saiba mais
-            </Button>
-          </Card>
-        </div>
-        <div className="mt-8 text-center">
-          <Button as="link" href="/projetos" variant="outline" size="lg">
-            Ver todos os projetos
-          </Button>
-        </div>
-      </Section>
+      <Testimonials title="O que dizem sobre nós" items={depoimentos} courses={[]} />
 
-      {/* Depoimentos */}
-      <Testimonials
-        items={depoimentos}
-        courses={courses.map((c) => ({ id: c.id, name: c.name }))}
-      />
-
-      {/* Parceiros */}
-      <Section title="Parceiros e apoio" background="muted">
-        <div className="flex flex-wrap items-center justify-center gap-8">
-          {partners.length === 0 ? (
-            <p className="text-center text-[var(--igh-muted)]">Nenhum parceiro cadastrado.</p>
-          ) : (
-            partners.map((p) => (
+      {partners.length > 0 ? (
+        <Section title="Parceiros e apoio" background="muted">
+          <div className="flex flex-wrap items-center justify-center gap-8">
+            {partners.map((p) => (
               <a
                 key={p.id}
                 href={p.websiteUrl || undefined}
@@ -193,13 +155,12 @@ export default async function HomePage({ searchParams }: Props) {
                   <span className="line-clamp-2 text-center">{p.name}</span>
                 )}
               </a>
-            ))
-          )}
-        </div>
-      </Section>
+            ))}
+          </div>
+        </Section>
+      ) : null}
 
-      {/* Blog / Notícias */}
-      <Section title="Notícias" subtitle="Acompanhe as novidades do IGH.">
+      <Section title="Notícias" subtitle={`Acompanhe as novidades de ${siteName}.`}>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {recentPosts.map((post) => (
             <BlogCard key={post.slug} post={post} />
@@ -212,18 +173,13 @@ export default async function HomePage({ searchParams }: Props) {
         </div>
       </Section>
 
-      {/* FAQ */}
       {faqItems.length > 0 && <FAQ items={faqItems} />}
 
-      {/* CTA final */}
       <CTASection
-        title="Pronto para começar?"
-        subtitle="Inscreva-se em uma formação, fale com a gente ou doe equipamentos."
-        primaryCTA={{ label: "Quero me inscrever", href: "/inscreva" }}
-        secondaryCTAs={[
-          { label: "Fale com o IGH", href: "/contato" },
-          { label: "Doe equipamentos", href: "/projetos/doacoes-recebidas" },
-        ]}
+        title="Pronto para participar?"
+        subtitle="Reserve um passeio ou fale conosco."
+        primaryCTA={{ label: "Ver passeios", href: "/passeios" }}
+        secondaryCTAs={[{ label: `Fale com ${siteName}`, href: "/contato" }]}
       />
     </>
   );

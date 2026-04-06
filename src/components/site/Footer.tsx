@@ -5,17 +5,27 @@ import type { MenuItemPublic, SiteSettingsPublic } from "@/lib/site-types";
 
 const FALLBACK_LINKS = [
   { label: "Início", href: "/" },
+  { label: "Passeios", href: "/passeios" },
   { label: "Sobre", href: "/sobre" },
   { label: "Formações", href: "/formacoes" },
   { label: "Projetos", href: "/projetos" },
   { label: "Notícias", href: "/noticias" },
-  { label: "Transparência", href: "/transparencia" },
   { label: "Contato", href: "/contato" },
   { label: "Área do Aluno", href: "/login" },
 ];
 
 function hasSubItems(items: MenuItemPublic[]): boolean {
   return items.some((i) => i.children && i.children.length > 0);
+}
+
+/** Remove entradas com o href dado (ex.: link oculto no site). */
+function excludeMenuHref(items: MenuItemPublic[], href: string): MenuItemPublic[] {
+  return items
+    .filter((i) => i.href !== href)
+    .map((i) => ({
+      ...i,
+      children: i.children?.length ? excludeMenuHref(i.children, href) : [],
+    }));
 }
 
 type FooterProps = {
@@ -43,9 +53,11 @@ function formatAddress(a: AddressEntry): string {
 }
 
 export function Footer({ menuItems, settings }: FooterProps) {
-  const showHierarchy = menuItems && menuItems.length > 0 && hasSubItems(menuItems);
+  const menuItemsFiltered = menuItems?.length ? excludeMenuHref(menuItems, "/transparencia") : null;
+  const showHierarchy =
+    menuItemsFiltered && menuItemsFiltered.length > 0 && hasSubItems(menuItemsFiltered);
 
-  const siteName = settings?.siteName ?? "Instituto Gustavo Hessel";
+  const siteName = settings?.siteName?.trim() || "Site";
   const addresses = normalizeAddresses(settings?.addresses);
   const addressLines = addresses.map(formatAddress).filter(Boolean);
 
@@ -96,16 +108,16 @@ export function Footer({ menuItems, settings }: FooterProps) {
               </div>
             ) : null}
             <p className={`text-xl font-bold text-white ${settings?.logoUrl ? "mt-2" : ""}`}>{siteName}</p>
-            <p className="mt-2 text-sm text-white/80">
-              Formação em tecnologia e inclusão digital para transformar vidas.
-            </p>
+            {settings?.seoTitleDefault?.trim() ? (
+              <p className="mt-2 text-sm text-white/80">{settings.seoTitleDefault.trim()}</p>
+            ) : null}
           </div>
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-white/90">Links</h3>
             <ul className="mt-4 list-none pl-0">
-              {showHierarchy && menuItems ? (
+              {showHierarchy && menuItemsFiltered ? (
                 <>
-                  {menuItems.map((item) => (
+                  {menuItemsFiltered.map((item) => (
                     <li key={item.id}>
                       <Link
                         href={item.href}
@@ -139,8 +151,8 @@ export function Footer({ menuItems, settings }: FooterProps) {
                   </li>
                 </>
               ) : (
-                (menuItems && menuItems.length > 0
-                  ? [...menuItems.flatMap((i) => [i, ...(i.children || [])]), { label: "Área do Aluno", href: "/login", id: "login", order: 999, isExternal: false, children: [] } as MenuItemPublic]
+                (menuItemsFiltered && menuItemsFiltered.length > 0
+                  ? [...menuItemsFiltered.flatMap((i) => [i, ...(i.children || [])]), { label: "Área do Aluno", href: "/login", id: "login", order: 999, isExternal: false, children: [] } as MenuItemPublic]
                   : FALLBACK_LINKS.map((link) => ({ ...link, id: link.href, order: 0, isExternal: false, children: [] } as MenuItemPublic))
                 ).map((link) => (
                   <li key={link.href}>

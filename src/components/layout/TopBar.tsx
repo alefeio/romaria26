@@ -2,15 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Button } from "@/components/ui/Button";
 import type { ApiResponse } from "@/lib/api-types";
-import { playNotificationSound } from "@/lib/notification-sound";
 
 type RoleOption = {
-  value: "STUDENT" | "TEACHER" | "ADMIN" | "MASTER" | "CUSTOMER";
+  value: "ADMIN" | "MASTER" | "CUSTOMER";
   label: string;
 };
 
@@ -21,159 +20,44 @@ export function TopBar({
     id: string;
     name: string;
     email: string;
-    role: "MASTER" | "ADMIN" | "TEACHER" | "STUDENT" | "CUSTOMER";
-    baseRole?: "MASTER" | "ADMIN" | "TEACHER" | "STUDENT" | "CUSTOMER";
+    role: "MASTER" | "ADMIN" | "CUSTOMER";
+    baseRole?: "MASTER" | "ADMIN" | "CUSTOMER";
     isAdmin?: boolean;
-    hasStudentProfile?: boolean;
-    hasTeacherProfile?: boolean;
-    availableRoles?: { canMaster: boolean; canStudent: boolean; canTeacher: boolean; canAdmin: boolean };
+    availableRoles?: {
+      canMaster: boolean;
+      canAdmin: boolean;
+      canCustomer?: boolean;
+    };
   };
 }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [switchingRole, setSwitchingRole] = useState(false);
-  const [supportBadge, setSupportBadge] = useState<{ unreadCount?: number; openCount?: number }>({});
-  const [notificationBadge, setNotificationBadge] = useState<{ hasUnread?: boolean }>({});
-
-  const isSupport =
-    user.role === "MASTER" ||
-    user.role === "ADMIN" ||
-    user.baseRole === "MASTER" ||
-    user.baseRole === "ADMIN" ||
-    user.isAdmin;
-
-  const fetchSupportBadge = useCallback(() => {
-    fetch("/api/me/support/badge", { credentials: "include", cache: "no-store" })
-      .then((r) =>
-        r.json() as Promise<ApiResponse<{ unreadCount?: number; openCount?: number }>>
-      )
-      .then((json) => {
-        if (json?.ok && json.data) setSupportBadge(json.data);
-      })
-      .catch(() => {});
-  }, []);
-
-  const isSupportRef = useRef(isSupport);
-  isSupportRef.current = isSupport;
-  const userIdRef = useRef(user.id);
-  userIdRef.current = user.id;
-
-  useEffect(() => {
-    fetchSupportBadge();
-
-    if (typeof window === "undefined") return;
-
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws/support`;
-    let ws: WebSocket | null = null;
-    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
-
-    function connect() {
-      ws = new WebSocket(wsUrl);
-      ws.onopen = () => {
-        fetchSupportBadge();
-      };
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data as string) as {
-            type?: string;
-            audience?: string;
-            forUserId?: string;
-          };
-          if (data.type !== "support_badge") return;
-          const audience = data.audience ?? "all";
-          const forUserId = typeof data.forUserId === "string" ? data.forUserId : undefined;
-          const support = isSupportRef.current;
-
-          /* Admin respondeu: só o aluno dono do chamado deve atualizar badge e ouvir som. */
-          if (audience === "student" && forUserId && forUserId !== userIdRef.current) {
-            return;
-          }
-
-          const shouldRefetch =
-            audience === "all" ||
-            (audience === "student" && !support) ||
-            (audience === "admin" && support);
-          const isNewMessage = audience === "student" || audience === "admin";
-          if (shouldRefetch) {
-            setTimeout(() => {
-              fetchSupportBadge();
-              if (isNewMessage) playNotificationSound();
-            }, 0);
-          }
-        } catch {
-          // ignorar mensagem inválida
-        }
-      };
-      ws.onclose = () => {
-        ws = null;
-        reconnectTimeout = setTimeout(connect, 3000);
-      };
-      ws.onerror = () => {
-        ws?.close();
-      };
-    }
-
-    connect();
-
-    return () => {
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-      ws?.close();
-    };
-  }, [fetchSupportBadge]);
-
-  useEffect(() => {
-    const onVisible = () => {
-      if (typeof document !== "undefined" && document.visibilityState === "visible") {
-        fetchSupportBadge();
-      }
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, []);
-
-  useEffect(() => {
-    const onRefetch = () => fetchSupportBadge();
-    window.addEventListener("support-badge-refetch", onRefetch);
-    return () => window.removeEventListener("support-badge-refetch", onRefetch);
-  }, [fetchSupportBadge]);
-
-  useEffect(() => {
-    fetch("/api/me/notifications/badge", { credentials: "include" })
-      .then((r) => r.json() as Promise<ApiResponse<{ hasUnread?: boolean }>>)
-      .then((json) => {
-        if (json?.ok && json.data) setNotificationBadge(json.data);
-      })
-      .catch(() => {});
-  }, []);
 
   const r = user.availableRoles;
-  const canMaster = r?.canMaster ?? (user.baseRole === "MASTER");
-  const canStudent = r?.canStudent ?? (user.hasStudentProfile === true);
-  const canTeacher = r?.canTeacher ?? (user.hasTeacherProfile === true);
-  const canAdmin = r?.canAdmin ?? (user.isAdmin === true || user.baseRole === "ADMIN");
+  const canMaster = r?.canMaster ?? user.baseRole === "MASTER";
+  const canAdmin =
+    r?.canAdmin ?? (user.isAdmin === true || user.baseRole === "ADMIN" || user.baseRole === "MASTER");
+  const canCustomer = r?.canCustomer ?? user.baseRole === "CUSTOMER";
 
-  const roleLabels: Record<string, string> = {
+  const roleLabels: Record<RoleOption["value"], string> = {
     MASTER: "Administrador Master",
-    ADMIN: "Admin",
-    TEACHER: "Professor",
-    STUDENT: "Aluno",
+    ADMIN: "Admin (site)",
     CUSTOMER: "Cliente",
   };
 
   let roleOptions: RoleOption[] = [
     ...(canMaster ? [{ value: "MASTER" as const, label: roleLabels.MASTER }] : []),
-    ...(canStudent ? [{ value: "STUDENT" as const, label: roleLabels.STUDENT }] : []),
-    ...(canTeacher ? [{ value: "TEACHER" as const, label: roleLabels.TEACHER }] : []),
     ...(canAdmin ? [{ value: "ADMIN" as const, label: roleLabels.ADMIN }] : []),
+    ...(canCustomer ? [{ value: "CUSTOMER" as const, label: roleLabels.CUSTOMER }] : []),
   ];
   if (!roleOptions.some((o) => o.value === user.role)) {
-    roleOptions = [...roleOptions, { value: user.role as RoleOption["value"], label: roleLabels[user.role] ?? user.role }];
+    roleOptions = [...roleOptions, { value: user.role, label: roleLabels[user.role as RoleOption["value"]] ?? user.role }];
   }
   const hasMoreThanOneProfile = roleOptions.length >= 2;
 
-  async function onRoleChange(newRole: "STUDENT" | "TEACHER" | "ADMIN" | "MASTER") {
+  async function onRoleChange(newRole: RoleOption["value"]) {
     if (newRole === user.role) return;
     setSwitchingRole(true);
     try {
@@ -182,7 +66,8 @@ export function TopBar({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role: newRole }),
       });
-      if (res.ok) router.refresh();
+      const json = (await res.json()) as ApiResponse<unknown>;
+      if (res.ok && json?.ok) router.refresh();
     } finally {
       setSwitchingRole(false);
     }
@@ -198,57 +83,6 @@ export function TopBar({
     <div className="flex shrink-0 items-center justify-end gap-2 px-3 py-2">
       <div className="relative flex items-center gap-2">
         <ThemeToggle aria-label="Alternar tema" />
-        {/* Ícone de notificações gerais (sino) */}
-        <span className="relative inline-flex">
-          <Link
-            href="/notificacoes"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] transition hover:bg-[var(--igh-surface)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--igh-primary)] focus:ring-offset-2"
-            title="Notificações"
-            aria-label="Notificações"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-          </Link>
-          {notificationBadge.hasUnread && (
-            <span
-              className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-[var(--card-bg)]"
-              aria-hidden
-              title="Novas notificações"
-            />
-          )}
-        </span>
-        {/* Ícone de suporte com bolinha verde para respostas/abertos */}
-        <span className="relative inline-flex">
-          <Link
-            href="/suporte"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] transition hover:bg-[var(--igh-surface)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--igh-primary)] focus:ring-offset-2"
-            title="Suporte técnico"
-            aria-label="Suporte técnico"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-          </Link>
-          {/* Aluno (perfil atual): bolinha quando tem resposta nova nos próprios chamados */}
-          {user.role === "STUDENT" && !isSupport && (supportBadge.unreadCount ?? 0) > 0 && (
-            <span
-              className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-[var(--card-bg)]"
-              aria-hidden
-              title="Nova resposta no suporte"
-            />
-          )}
-          {/* Admin/Master: badge numérico para chamados em aberto */}
-          {isSupport && supportBadge.openCount != null && supportBadge.openCount > 0 && (
-            <span
-              className="absolute -right-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-green-500 px-1 text-[10px] font-bold text-white ring-2 ring-[var(--card-bg)]"
-              aria-label={`${supportBadge.openCount} chamado(s) novo(s)`}
-            >
-              {supportBadge.openCount > 99 ? "99+" : supportBadge.openCount}
-            </span>
-          )}
-        </span>
         <div className="relative">
           <button
             type="button"
@@ -286,7 +120,7 @@ export function TopBar({
                     <select
                       value={user.role}
                       disabled={switchingRole}
-                      onChange={(e) => onRoleChange(e.target.value as "STUDENT" | "TEACHER" | "ADMIN" | "MASTER")}
+                      onChange={(e) => void onRoleChange(e.target.value as RoleOption["value"])}
                       className="w-full rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] px-2 py-1.5 text-sm text-[var(--input-text)] focus:border-[var(--igh-primary)] focus:outline-none"
                     >
                       {roleOptions.map((opt) => (

@@ -62,7 +62,7 @@ export async function createReservationInTransaction(
     customerEmailSnapshot,
     customerPhoneSnapshot,
     notes,
-    initialStatus = "CONFIRMED",
+    initialStatus = "PENDING",
   } = input;
 
   if (!isUuid(packageId) || !isUuid(userId)) {

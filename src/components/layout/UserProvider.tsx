@@ -6,14 +6,10 @@ export type SessionUser = {
   id: string;
   name: string;
   email: string;
-  role: "MASTER" | "ADMIN" | "TEACHER" | "STUDENT" | "CUSTOMER";
-  baseRole?: "MASTER" | "ADMIN" | "TEACHER" | "STUDENT" | "CUSTOMER";
+  role: "MASTER" | "ADMIN" | "CUSTOMER";
+  baseRole?: "MASTER" | "ADMIN" | "CUSTOMER";
   mustChangePassword?: boolean;
   isAdmin?: boolean;
-  /** True se o usuário possui perfil de aluno (Student) ativo. */
-  hasStudentProfile?: boolean;
-  /** True se o usuário possui perfil de professor (Teacher) ativo. */
-  hasTeacherProfile?: boolean;
 };
 
 const UserContext = createContext<SessionUser | null>(null);

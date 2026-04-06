@@ -1,5 +1,7 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { Navbar, Footer, FloatingChatWidget } from "@/components/site";
 import { getSessionUserFromCookie } from "@/lib/auth";
+import { getMetadataBase, siteIconsFromSettings } from "@/lib/site-metadata";
 import { getMenuItems, getSiteSettings } from "@/lib/site-data";
 
 function absoluteUrl(pathOrUrl: string, baseUrl: string): string {
@@ -10,17 +12,22 @@ function absoluteUrl(pathOrUrl: string, baseUrl: string): string {
 }
 
 export async function generateMetadata() {
+  noStore();
   const settings = await getSiteSettings();
-  const siteName = settings?.siteName ?? "IGH";
-  const defaultTitle = "Instituto Gustavo Hessel | Formação em tecnologia e inclusão digital";
-  const defaultDescription = "Formações gratuitas em programação, dados, UX/UI e mais. Inclusão digital e recondicionamento de computadores.";
-  const title = settings?.seoTitleDefault ?? defaultTitle;
-  const description = settings?.seoDescriptionDefault ?? defaultDescription;
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "";
+  const siteName = settings?.siteName?.trim() || "Site";
+  const defaultTitle = `${siteName} | Início`;
+  const defaultDescription =
+    "Passeios, projetos e notícias. Personalize título e texto em Configurações gerais do site.";
+  const title = settings?.seoTitleDefault?.trim() || defaultTitle;
+  const description = settings?.seoDescriptionDefault?.trim() || defaultDescription;
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+  const metadataBase = getMetadataBase();
 
   const openGraph: { title: string; description: string; images?: { url: string; width?: number; height?: number; alt?: string }[] } = {
-    title: settings?.seoTitleDefault ?? "Instituto Gustavo Hessel",
-    description: settings?.seoDescriptionDefault ?? defaultDescription,
+    title: settings?.seoTitleDefault?.trim() || siteName,
+    description: settings?.seoDescriptionDefault?.trim() || defaultDescription,
   };
   const logoUrl = settings?.logoUrl?.trim();
   if (logoUrl) {
@@ -31,11 +38,13 @@ export async function generateMetadata() {
   }
 
   return {
+    ...(metadataBase ? { metadataBase } : {}),
     title: {
       default: title,
       template: `%s | ${siteName}`,
     },
     description,
+    icons: siteIconsFromSettings(settings),
     openGraph,
     twitter: { card: "summary_large_image", title: openGraph.title, description: openGraph.description },
   };
@@ -69,7 +78,7 @@ export default async function InstitutionalLayout({
       <Navbar menuItems={menuItems} settings={settings} sessionUser={sessionUser} />
       <main id="main-content" className="min-h-[50vh]" style={{ background: "var(--background)" }}>{children}</main>
       <Footer menuItems={menuItems} settings={settings} />
-      <FloatingChatWidget contactWhatsapp={settings?.contactWhatsapp} />
+      <FloatingChatWidget contactWhatsapp={settings?.contactWhatsapp} siteName={settings?.siteName} />
     </>
   );
 }

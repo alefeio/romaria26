@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CloudinaryImageUpload } from "@/components/admin/CloudinaryImageUpload";
+import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import { SortableTableRows, SortableTableDndWrapper } from "@/components/admin/SortableTableRows";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { Badge } from "@/components/ui/Badge";
@@ -47,6 +47,13 @@ function dateToInput(d: string | Date | null): string {
   if (!d) return "";
   const x = typeof d === "string" ? d : (d as Date).toISOString?.()?.slice(0, 10) ?? "";
   return x.slice(0, 10);
+}
+
+function postThumbnailUrl(p: Post): string | null {
+  const cover = p.coverImageUrl?.trim();
+  if (cover) return cover;
+  const first = p.imageUrls?.find((u) => u?.trim());
+  return first?.trim() ?? null;
 }
 
 export default function NoticiasPage() {
@@ -347,6 +354,7 @@ export default function NoticiasPage() {
           <Table>
             <thead>
               <tr>
+                <Th className="w-16">Capa</Th>
                 <Th>Título</Th>
                 <Th>Categoria</Th>
                 <Th>Publicação</Th>
@@ -355,8 +363,26 @@ export default function NoticiasPage() {
               </tr>
             </thead>
             <tbody>
-              {posts.map((p) => (
+              {posts.map((p) => {
+                const thumb = postThumbnailUrl(p);
+                return (
                 <tr key={p.id} className="border-b border-[var(--card-border)]">
+                  <Td className="w-16 align-middle">
+                    {thumb ? (
+                      <img
+                        src={thumb}
+                        alt=""
+                        className="h-12 w-12 rounded-md border border-[var(--card-border)] object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="flex h-12 w-12 items-center justify-center rounded-md border border-dashed border-[var(--card-border)] bg-[var(--igh-surface)] text-[10px] text-[var(--text-muted)]"
+                        title="Sem imagem"
+                      >
+                        —
+                      </div>
+                    )}
+                  </Td>
                   <Td className="font-medium text-[var(--text-primary)]">{p.title}</Td>
                   <Td className="text-sm text-[var(--text-muted)]">{p.category?.name ?? "—"}</Td>
                   <Td className="text-sm text-[var(--text-muted)]">{dateToInput(p.publishedAt) || "—"}</Td>
@@ -374,12 +400,13 @@ export default function NoticiasPage() {
                     </div>
                   </Td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
             {posts.length === 0 && (
               <tbody>
                 <tr>
-                  <td colSpan={5} className="py-4 text-center text-sm text-[var(--text-muted)]">
+                  <td colSpan={6} className="py-4 text-center text-sm text-[var(--text-muted)]">
                     Nenhum post.
                   </td>
                 </tr>
@@ -460,7 +487,13 @@ export default function NoticiasPage() {
           <div>
             <label className="text-sm font-medium">URL da imagem de capa</label>
             <Input className="mt-1" value={postCoverUrl} onChange={(e) => setPostCoverUrl(e.target.value)} placeholder="https://..." />
-            <CloudinaryImageUpload kind="news" currentUrl={postCoverUrl || undefined} onUploaded={setPostCoverUrl} label="Ou envie uma imagem" />
+            <ImageUploadField
+              kind="news"
+              id={postEditing?.id}
+              currentUrl={postCoverUrl || undefined}
+              onUploaded={setPostCoverUrl}
+              label="Ou envie uma imagem"
+            />
           </div>
           <div>
             <label className="text-sm font-medium">Imagens adicionais (galeria / carrossel)</label>
@@ -475,7 +508,13 @@ export default function NoticiasPage() {
               ))}
             </ul>
             <div className="mt-2">
-              <CloudinaryImageUpload kind="news" currentUrl={undefined} onUploaded={(url) => setPostImageUrls((prev) => [...prev, url])} label="Adicionar imagem" />
+              <ImageUploadField
+                kind="news"
+                id={postEditing?.id}
+                currentUrl={undefined}
+                onUploaded={(url) => setPostImageUrls((prev) => [...prev, url])}
+                label="Adicionar imagem"
+              />
             </div>
           </div>
           <div>

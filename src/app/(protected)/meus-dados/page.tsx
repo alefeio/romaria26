@@ -10,15 +10,15 @@ export const metadata = {
 
 export default async function MeusDadosPage() {
   const user = await getSessionUserFromCookie();
-  if (!user || user.role !== "STUDENT") {
+  if (!user || user.role !== "CUSTOMER") {
     redirect("/login");
   }
   return (
     <div className="flex min-w-0 flex-col gap-6 sm:gap-8">
       <DashboardHero
-        eyebrow="Aluno"
+        eyebrow="Cliente"
         title="Meus dados"
-        description="Complete seu cadastro com os dados restantes e anexe documento de identidade e comprovante de residência."
+        description="Atualize seus dados de contato quando precisar."
       />
       <SectionCard
         title="Cadastro e documentos"

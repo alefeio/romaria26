@@ -1,6 +1,9 @@
-export const statsImpact = [
-  { value: "2.500+", label: "Alunos formados" },
-  { value: "15.000+", label: "Computadores doados" },
-  { value: "180+", label: "Laboratórios montados" },
-  { value: "12", label: "Estados atendidos" },
-] as const;
+export const awardsShowcase = {
+  heading: "Gratidão pelos grandes prêmios conquistados",
+  awards: [
+    { year: "2019", title: "Campeã da Melhor decoração da Romaria Fluvial" },
+    { year: "2018", title: "Melhor Embarcação com mais animação da Romaria Fluvial" },
+    { year: "2017", title: "Campeã a Melhor decoração da Romaria Fluvial" },
+    { year: "2016", title: "Vice-Campeã a Melhor decoração da Romaria Fluvial" },
+  ],
+} as const;

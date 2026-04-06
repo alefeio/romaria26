@@ -24,8 +24,6 @@ export function getAuthCookieOptions() {
 export type SessionUser = Pick<User, "id" | "name" | "email" | "role" | "isActive" | "mustChangePassword"> & {
   isAdmin?: boolean;
   baseRole?: UserRole;
-  hasStudentProfile?: boolean;
-  hasTeacherProfile?: boolean;
 };
 
 interface JwtPayload {
@@ -95,8 +93,6 @@ export async function getSessionUserFromCookie(): Promise<SessionUser | null> {
         isAdmin: true,
         isActive: true,
         mustChangePassword: true,
-        student: { select: { id: true } },
-        teacher: { select: { id: true } },
       },
     });
 
@@ -113,8 +109,6 @@ export async function getSessionUserFromCookie(): Promise<SessionUser | null> {
       isActive: user.isActive,
       mustChangePassword: user.mustChangePassword ?? false,
       isAdmin: user.isAdmin ?? false,
-      hasStudentProfile: !!user.student,
-      hasTeacherProfile: !!user.teacher,
     };
   } catch {
     return null;

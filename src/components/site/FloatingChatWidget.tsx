@@ -8,7 +8,7 @@ const ANA_AVATAR = "/images/Ana-Atendente-Virtual.png";
 const TYPING_DELAY_MS = 1200;
 
 type ChatContext = {
-  courses: { name: string; slug: string; url: string }[];
+  packages: { name: string; slug: string; url: string }[];
   faq: { pergunta: string; resposta: string }[];
 };
 
@@ -23,8 +23,8 @@ type View =
   | "initial"
   | "faq-list"
   | { faqAnswer: number }
-  | "cursos"
-  | "inscrever"
+  | "passeios"
+  | "reservar"
   | "whatsapp";
 
 function buildWhatsAppHref(contactWhatsapp: string | null | undefined): string | null {
@@ -34,8 +34,10 @@ function buildWhatsAppHref(contactWhatsapp: string | null | undefined): string |
   return `https://wa.me/${withCountry}`;
 }
 
-const WELCOME_MESSAGE =
-  "Olá! Sou a Nina, atendente virtual do IGH. O que você precisa? Escolha uma opção abaixo.";
+function welcomeMessage(siteLabel: string) {
+  const extra = siteLabel.trim() ? ` de ${siteLabel.trim()}` : "";
+  return `Olá! Sou a Nina, atendente virtual${extra}. O que você precisa? Escolha uma opção abaixo.`;
+}
 
 /** Âncora para abrir o chat via link (ex.: banner). Use o link /#nina ou qualquer página + #nina */
 export const CHAT_OPEN_HASH = "nina";
@@ -63,16 +65,20 @@ function TypingDots() {
 
 export function FloatingChatWidget({
   contactWhatsapp,
+  siteName,
   labelButton = "Atendimento automático",
 }: {
   contactWhatsapp: string | null | undefined;
+  /** Nome da instituição (Configurações gerais). */
+  siteName?: string | null;
   labelButton?: string;
 }) {
+  const siteLabel = (siteName ?? "").trim();
   const [isOpen, setIsOpen] = useState(false);
   const [context, setContext] = useState<ChatContext | null>(null);
   const [loadingContext, setLoadingContext] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
-    { id: "0", role: "bot", content: WELCOME_MESSAGE },
+    { id: "0", role: "bot", content: welcomeMessage(siteLabel) },
   ]);
   const [view, setView] = useState<View>("initial");
   const [isTyping, setIsTyping] = useState(false);
@@ -89,10 +95,10 @@ export function FloatingChatWidget({
       if (res.ok && json?.ok && json.data) {
         setContext(json.data);
       } else {
-        setContext({ courses: [], faq: [] });
+        setContext({ packages: [], faq: [] });
       }
     } catch {
-      setContext({ courses: [], faq: [] });
+      setContext({ packages: [], faq: [] });
     } finally {
       setLoadingContext(false);
     }
@@ -119,9 +125,9 @@ export function FloatingChatWidget({
   }, []);
 
   const goBack = useCallback(() => {
-    setMessages([{ id: "0", role: "bot", content: WELCOME_MESSAGE }]);
+    setMessages([{ id: "0", role: "bot", content: welcomeMessage(siteLabel) }]);
     setView("initial");
-  }, []);
+  }, [siteLabel]);
 
   const addUserMessage = useCallback((content: string) => {
     const userId = `u-${Date.now()}`;
@@ -154,27 +160,27 @@ export function FloatingChatWidget({
   );
 
   const handleOption = useCallback(
-    (option: "cursos" | "duvidas" | "inscrever" | "whatsapp") => {
-      if (option === "cursos") {
-        const ctx = context ?? { courses: [], faq: [] };
-        if (ctx.courses.length === 0) {
+    (option: "passeios" | "duvidas" | "reservar" | "whatsapp") => {
+      if (option === "passeios") {
+        const ctx = context ?? { packages: [], faq: [] };
+        if (ctx.packages.length === 0) {
           scheduleBotReply(
-            "Ver cursos",
-            "No momento não há cursos disponíveis na listagem. Você pode acessar a página de formações ou falar conosco pelo WhatsApp para mais informações.",
-            "cursos",
+            "Ver passeios",
+            "No momento não há passeios publicados. Veja a página de passeios ou fale conosco pelo WhatsApp.",
+            "passeios",
             whatsappHref ? [{ label: "Falar no WhatsApp", href: whatsappHref }] : undefined
           );
           return;
         }
-        const courseLinks = ctx.courses.map((c) => ({ label: c.name, href: c.url }));
+        const links = ctx.packages.map((p) => ({ label: p.name, href: p.url }));
         scheduleBotReply(
-          "Ver cursos",
-          "Temos estas formações e cursos. Clique no que te interessar para ver detalhes e se inscrever.",
-          "cursos",
-          courseLinks
+          "Ver passeios",
+          "Estes são os passeios com reserva online. Clique para ver datas e valores.",
+          "passeios",
+          links
         );
       } else if (option === "duvidas") {
-        const ctx = context ?? { courses: [], faq: [] };
+        const ctx = context ?? { packages: [], faq: [] };
         if (ctx.faq.length === 0) {
           scheduleBotReply(
             "Tirar dúvidas",
@@ -185,12 +191,12 @@ export function FloatingChatWidget({
           return;
         }
         scheduleBotReply("Tirar dúvidas", "Escolha uma pergunta:", "faq-list");
-      } else if (option === "inscrever") {
+      } else if (option === "reservar") {
         scheduleBotReply(
-          "Quero me inscrever",
-          "Você pode se inscrever em um curso pela nossa página de inscrição. Escolha a turma e preencha seus dados.",
-          "inscrever",
-          [{ label: "Ir para inscrição", href: "/inscreva" }]
+          "Reservar passeio",
+          "Confira os passeios disponíveis e faça sua reserva online com datas e valores atualizados.",
+          "reservar",
+          [{ label: "Ver passeios", href: "/passeios" }]
         );
       } else {
         if (whatsappHref) {
@@ -214,7 +220,7 @@ export function FloatingChatWidget({
 
   const handleFaqQuestion = useCallback(
     (index: number) => {
-      const ctx = context ?? { courses: [], faq: [] };
+      const ctx = context ?? { packages: [], faq: [] };
       const item = ctx.faq[index];
       if (!item) return;
       scheduleBotReply(item.pergunta, item.resposta, { faqAnswer: index });
@@ -226,19 +232,19 @@ export function FloatingChatWidget({
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     setIsOpen(false);
     setView("initial");
-    setMessages([{ id: "0", role: "bot", content: WELCOME_MESSAGE }]);
+    setMessages([{ id: "0", role: "bot", content: welcomeMessage(siteLabel) }]);
     setIsTyping(false);
     if (typeof window !== "undefined" && window.location.hash === `#${CHAT_OPEN_HASH}`) {
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
     }
-  }, []);
+  }, [siteLabel]);
 
-  const ctx = context ?? { courses: [], faq: [] };
+  const ctx = context ?? { packages: [], faq: [] };
   const showInitialButtons = !loadingContext && view === "initial" && messages.length <= 1 && !isTyping;
   const showFaqList = view === "faq-list" && ctx.faq.length > 0 && !isTyping;
   const showFaqAnswer = typeof view === "object" && "faqAnswer" in view;
-  const showCursosFooter = view === "cursos";
-  const showInscreverFooter = view === "inscrever";
+  const showPasseiosFooter = view === "passeios";
+  const showReservarFooter = view === "reservar";
   const showWhatsappFooter = view === "whatsapp";
 
   return (
@@ -363,10 +369,10 @@ export function FloatingChatWidget({
                   <div className="flex flex-col gap-2">
                     <button
                       type="button"
-                      onClick={() => handleOption("cursos")}
+                      onClick={() => handleOption("passeios")}
                       className="w-full rounded-lg bg-[var(--igh-surface)] px-3 py-2.5 text-sm font-medium text-[var(--igh-secondary)] hover:bg-[var(--igh-border)] text-left"
                     >
-                      Ver cursos
+                      Ver passeios
                     </button>
                     <button
                       type="button"
@@ -377,10 +383,10 @@ export function FloatingChatWidget({
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleOption("inscrever")}
+                      onClick={() => handleOption("reservar")}
                       className="w-full rounded-lg bg-[var(--igh-surface)] px-3 py-2.5 text-sm font-medium text-[var(--igh-secondary)] hover:bg-[var(--igh-border)] text-left"
                     >
-                      Inscrever-me em um curso
+                      Reservar um passeio
                     </button>
                     <button
                       type="button"
@@ -443,7 +449,7 @@ export function FloatingChatWidget({
                 </>
               )}
 
-              {(showCursosFooter || showInscreverFooter || showWhatsappFooter) && (
+              {(showPasseiosFooter || showReservarFooter || showWhatsappFooter) && (
                 <button
                   type="button"
                   onClick={goBack}

@@ -1,7 +1,16 @@
+import type { Metadata } from "next";
 import { PageHeader, Section, Card } from "@/components/site";
 import { SocialIcons } from "@/components/site/SocialIcons";
 import { getSiteSettings, getContatoPageForSite } from "@/lib/site-data";
 import { ContatoForm } from "./ContatoForm";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const s = await getSiteSettings();
+  const name = s?.siteName?.trim() || "Site";
+  const description = s?.seoDescriptionDefault?.trim() || `Fale com ${name} e envie sua mensagem.`;
+  const title = `Contato | ${name}`;
+  return { title, description, openGraph: { title, description } };
+}
 
 function normalizeAddresses(value: unknown): { line: string; city: string; state: string; zip: string }[] {
   if (!value || !Array.isArray(value)) return [];
@@ -23,7 +32,9 @@ export default async function ContatoPage() {
   const [settings, contatoPage] = await Promise.all([getSiteSettings(), getContatoPageForSite()]);
   const addresses = normalizeAddresses(settings?.addresses);
   const headerTitle = contatoPage?.title?.trim() || "Contato";
-  const headerSubtitle = contatoPage?.subtitle?.trim() || "Envie sua mensagem ou inscreva-se nas formações.";
+  const siteName = settings?.siteName?.trim() || "Site";
+  const headerSubtitle =
+    contatoPage?.subtitle?.trim() || `Envie sua mensagem ou fale com a equipe de ${siteName}.`;
   const headerImageUrl = contatoPage?.headerImageUrl?.trim() || null;
   const firstAddressLine = addresses.length > 0 ? formatAddress(addresses[0]) : null;
 

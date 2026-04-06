@@ -1,17 +1,14 @@
-import { getCoursesForSite, getFaqItems } from "@/lib/site-data";
+import { getPackagesForPublicSite, getFaqItems } from "@/lib/site-data";
 import { jsonOk } from "@/lib/http";
 
-/** Dados para o widget de atendimento: cursos (com link) e FAQ. Público, sem auth. */
+/** Dados para o widget de atendimento: passeios e FAQ. Público, sem auth. */
 export async function GET() {
-  const [courses, faqItems] = await Promise.all([
-    getCoursesForSite(),
-    getFaqItems(),
-  ]);
+  const [packagesList, faqItems] = await Promise.all([getPackagesForPublicSite(), getFaqItems()]);
 
-  const coursesForChat = courses.map((c) => ({
-    name: c.name,
-    slug: c.slug,
-    url: `/cursos/${encodeURIComponent(c.slug)}`,
+  const packagesForChat = packagesList.map((p) => ({
+    name: p.name,
+    slug: p.slug,
+    url: `/passeios/${encodeURIComponent(p.slug)}`,
   }));
 
   const faqForChat = faqItems.map((f) => ({
@@ -20,7 +17,7 @@ export async function GET() {
   }));
 
   return jsonOk({
-    courses: coursesForChat,
+    packages: packagesForChat,
     faq: faqForChat,
   });
 }

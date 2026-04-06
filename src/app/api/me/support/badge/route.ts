@@ -45,7 +45,7 @@ export async function GET() {
   }
 
   /** Bolinha verde do suporte é só para perfil aluno; professores/outros não enxergam contagem de chamados de aluno. */
-  if (user.role !== "STUDENT") {
+  if (user.role !== "CUSTOMER") {
     return jsonOk(
       { unreadCount: 0 },
       { headers: { "Cache-Control": "private, no-store, max-age=0" } }

@@ -7,7 +7,11 @@ import { useUser } from "@/components/layout/UserProvider";
 import { Button } from "@/components/ui/Button";
 import type { ApiResponse } from "@/lib/api-types";
 
-type RolesResponse = { canStudent: boolean; canTeacher: boolean; canAdmin: boolean; canMaster?: boolean };
+type RolesResponse = {
+  canAdmin: boolean;
+  canMaster?: boolean;
+  canCustomer?: boolean;
+};
 
 export default function EscolherPerfilPage() {
   useUser();
@@ -28,16 +32,15 @@ export default function EscolherPerfilPage() {
   }, []);
 
   const canAdmin = roles?.canAdmin === true;
-  const canStudent = roles?.canStudent === true;
-  const canTeacher = roles?.canTeacher === true;
   const canMaster = roles?.canMaster === true;
-  const hasAny = canAdmin || canStudent || canTeacher || canMaster;
+  const canCustomer = roles?.canCustomer === true;
+  const hasOperational = canAdmin || canMaster || canCustomer;
 
   useEffect(() => {
-    if (roles !== null && !hasAny) {
+    if (roles !== null && !hasOperational) {
       router.replace("/dashboard");
     }
-  }, [roles, hasAny, router]);
+  }, [roles, hasOperational, router]);
 
   if (roles === null) {
     return (
@@ -54,11 +57,11 @@ export default function EscolherPerfilPage() {
     );
   }
 
-  if (!hasAny) {
+  if (!hasOperational) {
     return null;
   }
 
-  async function enterAs(role: "STUDENT" | "TEACHER" | "ADMIN" | "MASTER") {
+  async function enterAs(role: "ADMIN" | "MASTER" | "CUSTOMER") {
     const res = await fetch("/api/auth/choose-role", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -72,29 +75,29 @@ export default function EscolherPerfilPage() {
     <div className="mx-auto flex w-full max-w-lg flex-col gap-6 px-4 py-8 sm:gap-8 sm:px-0 sm:py-4">
       <DashboardHero
         eyebrow="Sessão"
-        title="Como deseja acessar o sistema?"
-        description="Escolha o perfil com o qual deseja entrar nesta sessão."
+        title="Como deseja acessar?"
+        description="Escolha o perfil para esta sessão (operação de passeios e site)."
       />
       <SectionCard title="Perfis disponíveis" variant="elevated">
         <div className="flex flex-col gap-3">
-          {canStudent && (
-            <Button variant="primary" className="w-full" onClick={() => enterAs("STUDENT")}>
-              Entrar como Aluno
-            </Button>
-          )}
-          {canTeacher && (
-            <Button variant="primary" className="w-full" onClick={() => enterAs("TEACHER")}>
-              Entrar como Professor
-            </Button>
-          )}
           {canMaster && (
-            <Button variant="primary" className="w-full" onClick={() => enterAs("MASTER")}>
+            <Button variant="primary" className="w-full" onClick={() => void enterAs("MASTER")}>
               Entrar como Administrador Master
             </Button>
           )}
           {canAdmin && !canMaster && (
-            <Button variant="secondary" className="w-full" onClick={() => enterAs("ADMIN")}>
+            <Button variant="primary" className="w-full" onClick={() => void enterAs("ADMIN")}>
               Entrar como Admin
+            </Button>
+          )}
+          {canAdmin && canMaster && (
+            <Button variant="secondary" className="w-full" onClick={() => void enterAs("ADMIN")}>
+              Entrar como Admin
+            </Button>
+          )}
+          {canCustomer && (
+            <Button variant="secondary" className="w-full" onClick={() => void enterAs("CUSTOMER")}>
+              Entrar como Cliente
             </Button>
           )}
         </div>

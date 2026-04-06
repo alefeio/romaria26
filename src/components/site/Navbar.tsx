@@ -8,8 +8,8 @@ import type { MenuItemPublic, SiteSettingsPublic } from "@/lib/site-types";
 
 const FALLBACK_LINKS: MenuItemPublic[] = [
   { id: "1", label: "Início", href: "/", order: 0, isExternal: false, children: [] },
+  { id: "1b", label: "Passeios", href: "/passeios", order: 0.5, isExternal: false, children: [] },
   { id: "2", label: "Sobre", href: "/sobre", order: 1, isExternal: false, children: [] },
-  { id: "3", label: "Formações", href: "/formacoes", order: 2, isExternal: false, children: [] },
   { id: "4", label: "Projetos", href: "/projetos", order: 3, isExternal: false, children: [
     { id: "4a", label: "Computadores para Inclusão", href: "/projetos/computadores-para-inclusao", order: 0, isExternal: false, children: [] },
     { id: "4b", label: "CRC", href: "/projetos/crc", order: 1, isExternal: false, children: [] },
@@ -17,7 +17,6 @@ const FALLBACK_LINKS: MenuItemPublic[] = [
     { id: "4d", label: "Entregas", href: "/projetos/entregas", order: 3, isExternal: false, children: [] },
   ]},
   { id: "5", label: "Notícias", href: "/noticias", order: 4, isExternal: false, children: [] },
-  { id: "6", label: "Transparência", href: "/transparencia", order: 5, isExternal: false, children: [] },
   { id: "7", label: "Contato", href: "/contato", order: 6, isExternal: false, children: [] },
 ];
 
@@ -36,8 +35,11 @@ export function Navbar({ menuItems: propItems, settings, sessionUser }: NavbarPr
   const [scrolled, setScrolled] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
   const headerRef = useRef<HTMLElement>(null);
-  const links = (propItems && propItems.length > 0) ? propItems : FALLBACK_LINKS;
+  const links = ((propItems && propItems.length > 0) ? propItems : FALLBACK_LINKS).filter(
+    (l) => l.href !== "/transparencia"
+  );
   const logoUrl = settings?.logoUrl;
+  const siteTitle = settings?.siteName?.trim() || "Site";
 
   useEffect(() => {
     function onScroll() {
@@ -71,7 +73,7 @@ export function Navbar({ menuItems: propItems, settings, sessionUser }: NavbarPr
               <img src={logoUrl} alt={settings?.siteName ?? "Logo"} className={`w-auto object-contain transition-[height] ${scrolled ? "h-7 sm:h-8" : "h-10 sm:h-12"}`} />
             </span>
           ) : (
-            <span className="text-xl font-bold text-[var(--igh-primary)]">IGH</span>
+            <span className="text-xl font-bold text-[var(--igh-primary)]">{siteTitle}</span>
           )}
         </Link>
         <div className="hidden md:flex md:items-center md:gap-1">

@@ -1,6 +1,7 @@
 import "server-only";
+import type { PackageStatus } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getModulesWithLessonsByCourseId } from "@/lib/course-modules";
+import { getPackageRemainingCapacity } from "@/lib/reservations/create-reservation";
 import type { MenuItemPublic, SiteSettingsPublic } from "@/lib/site-types";
 
 export type { MenuItemPublic, SiteSettingsPublic };
@@ -88,32 +89,6 @@ export async function getAboutForSite(): Promise<AboutForSite | null> {
     const row = await prisma.siteAboutPage.findFirst({ orderBy: { updatedAt: "desc" } });
     if (!row) return null;
     return { title: row.title, subtitle: row.subtitle, content: row.content, imageUrl: row.imageUrl };
-  } catch {
-    return null;
-  }
-}
-
-// --- Página Formações (cabeçalho editável) ---
-export type FormacoesPageForSite = { title: string | null; subtitle: string | null; headerImageUrl: string | null };
-
-export async function getFormacoesPageForSite(): Promise<FormacoesPageForSite | null> {
-  try {
-    const row = await prisma.siteFormacoesPage.findFirst({ orderBy: { updatedAt: "desc" } });
-    if (!row) return null;
-    return { title: row.title, subtitle: row.subtitle, headerImageUrl: row.headerImageUrl };
-  } catch {
-    return null;
-  }
-}
-
-// --- Página Inscreva-se (cabeçalho editável) ---
-export type InscrevaPageForSite = { title: string | null; subtitle: string | null; headerImageUrl: string | null };
-
-export async function getInscrevaPageForSite(): Promise<InscrevaPageForSite | null> {
-  try {
-    const row = await prisma.siteInscrevaPage.findFirst({ orderBy: { updatedAt: "desc" } });
-    if (!row) return null;
-    return { title: row.title, subtitle: row.subtitle, headerImageUrl: row.headerImageUrl };
   } catch {
     return null;
   }
@@ -213,238 +188,6 @@ export async function getTestimonials(): Promise<TestimonialPublic[]> {
       photoUrl: t.photoUrl,
       order: t.order,
     }));
-  } catch {
-    return [];
-  }
-}
-
-// --- Formações ---
-export type FormationWithCourses = {
-  id: string;
-  title: string;
-  slug: string;
-  summary: string | null;
-  audience: string | null;
-  outcomes: string[];
-  finalProject: string | null;
-  prerequisites: string | null;
-  order: number;
-  isActive: boolean;
-  courses: {
-    order: number;
-    course: {
-      id: string;
-      name: string;
-      slug: string;
-      description: string | null;
-      content: string | null;
-      imageUrl: string | null;
-      workloadHours: number | null;
-      status: string;
-    };
-  }[];
-};
-
-export type HowFormationWorksItem = {
-  titulo: string;
-  descricao: string;
-};
-
-const COMO_FUNCIONA_FALLBACK: HowFormationWorksItem[] = [
-  { titulo: "Núcleo Comum", descricao: "Conteúdo base em tecnologia e competências transversais para todas as trilhas." },
-  { titulo: "Trilha Técnica", descricao: "Módulos específicos da área escolhida, com foco em prática e ferramentas atuais." },
-  { titulo: "Projeto Integrador", descricao: "Projeto real desenvolvido ao longo da formação, que compõe seu portfólio." },
-  { titulo: "Carreira e Demo Day", descricao: "Preparação para o mercado, networking e apresentação dos projetos." },
-];
-
-export async function getFormationsWithCourses(): Promise<FormationWithCourses[]> {
-  try {
-    const list = await prisma.siteFormation.findMany({
-      where: { isActive: true },
-      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-      include: {
-        courses: {
-          orderBy: { order: "asc" },
-          include: {
-            course: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-                description: true,
-                content: true,
-                imageUrl: true,
-                workloadHours: true,
-                status: true,
-              },
-            },
-          },
-        },
-      },
-    });
-    return list.map((f) => ({
-      id: f.id,
-      title: f.title,
-      slug: f.slug,
-      summary: f.summary,
-      audience: f.audience,
-      outcomes: f.outcomes,
-      finalProject: f.finalProject,
-      prerequisites: f.prerequisites,
-      order: f.order,
-      isActive: f.isActive,
-      courses: f.courses.map((fc) => ({
-        order: fc.order,
-        course: {
-          ...fc.course,
-          status: fc.course.status,
-        },
-      })),
-    }));
-  } catch {
-    return [];
-  }
-}
-
-export async function getFormationsForHome(limit = 4): Promise<FormationWithCourses[]> {
-  try {
-    const all = await getFormationsWithCourses();
-    return all.slice(0, limit);
-  } catch {
-    return [];
-  }
-}
-
-export function getComoFuncionaFormacao(): HowFormationWorksItem[] {
-  return COMO_FUNCIONA_FALLBACK;
-}
-
-// --- Formações como filtro (lista para botões) ---
-export type FormationFilterItem = { id: string; title: string; slug: string };
-
-export async function getFormationsForFilter(): Promise<FormationFilterItem[]> {
-  try {
-    const list = await prisma.siteFormation.findMany({
-      where: {
-        isActive: true,
-        courses: { some: {} },
-      },
-      orderBy: [{ order: "asc" }],
-      select: { id: true, title: true, slug: true },
-    });
-    return list;
-  } catch {
-    return [];
-  }
-}
-
-// --- Cursos para o site (com filtro por formação) ---
-export type LessonForSiteDetail = {
-  id: string;
-  title: string;
-  order: number;
-  durationMinutes: number | null;
-};
-
-export type ModuleForSiteDetail = {
-  id: string;
-  title: string;
-  description: string | null;
-  order: number;
-  lessons: LessonForSiteDetail[];
-};
-
-export type CourseForSite = {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  content: string | null;
-  imageUrl: string | null;
-  workloadHours: number | null;
-  formationId: string | null;
-  formationTitle: string | null;
-  formationSlug: string | null;
-  /** Preenchido apenas em getCourseBySlug (detalhe). */
-  modules?: ModuleForSiteDetail[];
-};
-
-export async function getCoursesForSite(formationSlug?: string): Promise<CourseForSite[]> {
-  try {
-    if (formationSlug) {
-      const formation = await prisma.siteFormation.findFirst({
-        where: { slug: formationSlug, isActive: true },
-        include: {
-          courses: {
-            orderBy: { order: "asc" },
-            include: {
-              course: {
-                select: {
-                  id: true,
-                  name: true,
-                  slug: true,
-                  description: true,
-                  content: true,
-                  imageUrl: true,
-                  workloadHours: true,
-                  status: true,
-                },
-              },
-            },
-          },
-        },
-      });
-      if (!formation) return [];
-      return formation.courses
-        .filter((fc) => fc.course != null && fc.course.status === "ACTIVE")
-        .map((fc) => ({
-          id: fc.course!.id,
-          name: fc.course!.name,
-          slug: fc.course!.slug,
-          description: fc.course!.description,
-          content: fc.course!.content,
-          imageUrl: fc.course!.imageUrl,
-          workloadHours: fc.course!.workloadHours,
-          formationId: formation.id,
-          formationTitle: formation.title,
-          formationSlug: formation.slug,
-        }));
-    }
-
-    const courses = await prisma.course.findMany({
-      where: { status: "ACTIVE" },
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        description: true,
-        content: true,
-        imageUrl: true,
-        workloadHours: true,
-        siteFormations: {
-          take: 1,
-          orderBy: { order: "asc" },
-          select: { formation: { select: { id: true, title: true, slug: true } } },
-        },
-      },
-    });
-
-    return courses.map((c) => {
-      const first = c.siteFormations[0]?.formation;
-      return {
-        id: c.id,
-        name: c.name,
-        slug: c.slug,
-        description: c.description,
-        content: c.content,
-        imageUrl: c.imageUrl,
-        workloadHours: c.workloadHours,
-        formationId: first?.id ?? null,
-        formationTitle: first?.title ?? null,
-        formationSlug: first?.slug ?? null,
-      };
-    });
   } catch {
     return [];
   }
@@ -661,54 +404,83 @@ export async function getTransparencyForSite(): Promise<TransparencyCategoryForS
   }
 }
 
-// --- Curso por slug (detalhe para modal/página) ---
-export async function getCourseBySlug(slug: string): Promise<CourseForSite | null> {
+// --- Passeios / pacotes (site público) ---
+export type PackagePublicListItem = {
+  id: string;
+  name: string;
+  slug: string;
+  shortDescription: string | null;
+  description: string | null;
+  price: string;
+  breakfastKitAvailable: boolean;
+  breakfastKitPrice: string;
+  departureDate: Date;
+  departureTime: string;
+  boardingLocation: string;
+  capacity: number;
+  status: PackageStatus;
+  coverImageUrl: string | null;
+  galleryImages: string[];
+  remainingPlaces: number | null;
+};
+
+async function toPackagePublicListItem(p: {
+  id: string;
+  name: string;
+  slug: string;
+  shortDescription: string | null;
+  description: string | null;
+  price: { toString(): string };
+  breakfastKitAvailable: boolean;
+  breakfastKitPrice: { toString(): string };
+  departureDate: Date;
+  departureTime: string;
+  boardingLocation: string;
+  capacity: number;
+  status: PackageStatus;
+  coverImageUrl: string | null;
+  galleryImages: string[];
+}): Promise<PackagePublicListItem> {
+  const remainingPlaces = await getPackageRemainingCapacity(p.id);
+  return {
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    shortDescription: p.shortDescription,
+    description: p.description,
+    price: p.price.toString(),
+    breakfastKitAvailable: p.breakfastKitAvailable,
+    breakfastKitPrice: p.breakfastKitPrice.toString(),
+    departureDate: p.departureDate,
+    departureTime: p.departureTime,
+    boardingLocation: p.boardingLocation,
+    capacity: p.capacity,
+    status: p.status,
+    coverImageUrl: p.coverImageUrl,
+    galleryImages: p.galleryImages,
+    remainingPlaces,
+  };
+}
+
+export async function getPackagesForPublicSite(): Promise<PackagePublicListItem[]> {
   try {
-    const course = await prisma.course.findFirst({
-      where: { slug, status: "ACTIVE" },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        description: true,
-        content: true,
-        imageUrl: true,
-        workloadHours: true,
-        siteFormations: {
-          take: 1,
-          orderBy: { order: "asc" },
-          select: { formation: { select: { id: true, title: true, slug: true } } },
-        },
-      },
+    const rows = await prisma.package.findMany({
+      where: { isActive: true, status: "OPEN" },
+      orderBy: [{ departureDate: "asc" }, { name: "asc" }],
     });
-    if (!course) return null;
-    const first = course.siteFormations[0]?.formation;
-    const modulesWithLessons = await getModulesWithLessonsByCourseId(course.id);
-    const modules: ModuleForSiteDetail[] = modulesWithLessons.map((m) => ({
-      id: m.id,
-      title: m.title,
-      description: m.description,
-      order: m.order,
-      lessons: m.lessons.map((l) => ({
-        id: l.id,
-        title: l.title,
-        order: l.order,
-        durationMinutes: l.durationMinutes,
-      })),
-    }));
-    return {
-      id: course.id,
-      name: course.name,
-      slug: course.slug,
-      description: course.description,
-      content: course.content,
-      imageUrl: course.imageUrl,
-      workloadHours: course.workloadHours,
-      formationId: first?.id ?? null,
-      formationTitle: first?.title ?? null,
-      formationSlug: first?.slug ?? null,
-      modules,
-    };
+    return Promise.all(rows.map((p) => toPackagePublicListItem(p)));
+  } catch {
+    return [];
+  }
+}
+
+export async function getPackageBySlugForPublic(slug: string): Promise<PackagePublicListItem | null> {
+  try {
+    const p = await prisma.package.findFirst({
+      where: { slug, isActive: true, status: "OPEN" },
+    });
+    if (!p) return null;
+    return toPackagePublicListItem(p);
   } catch {
     return null;
   }

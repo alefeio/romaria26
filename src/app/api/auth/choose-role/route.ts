@@ -9,7 +9,7 @@ import {
 import { jsonErr } from "@/lib/http";
 import type { UserRole } from "@/generated/prisma/client";
 
-const ALLOWED_ROLES: UserRole[] = ["STUDENT", "TEACHER", "ADMIN", "MASTER"];
+const ALLOWED_ROLES: UserRole[] = ["MASTER", "ADMIN", "CUSTOMER"];
 
 function jsonOkWithSession<T>(data: T, user: Parameters<typeof buildAuthSessionToken>[0], effectiveRole: UserRole) {
   return (async () => {
@@ -20,7 +20,6 @@ function jsonOkWithSession<T>(data: T, user: Parameters<typeof buildAuthSessionT
   })();
 }
 
-/** Define o papel com o qual o usuário vai acessar (Aluno, Professor ou Admin quando tem múltiplos perfis). */
 export async function POST(request: Request) {
   const user = await getSessionUserFromCookie();
   if (!user) {
@@ -33,20 +32,10 @@ export async function POST(request: Request) {
     return jsonErr("VALIDATION_ERROR", "Escolha inválida.", 400);
   }
 
-  const [full, hasStudent, hasTeacher] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: user.id },
-      select: { id: true, name: true, email: true, role: true, isAdmin: true, isActive: true, mustChangePassword: true },
-    }),
-    prisma.student.findFirst({
-      where: { userId: user.id, deletedAt: null },
-      select: { id: true },
-    }),
-    prisma.teacher.findFirst({
-      where: { userId: user.id, deletedAt: null },
-      select: { id: true },
-    }),
-  ]);
+  const full = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { id: true, name: true, email: true, role: true, isAdmin: true, isActive: true, mustChangePassword: true },
+  });
   if (!full || !full.isActive) {
     return jsonErr("UNAUTHORIZED", "Sessão inválida.", 401);
   }
@@ -69,24 +58,17 @@ export async function POST(request: Request) {
   }
 
   if (role === "ADMIN") {
-    if (!full.isAdmin && full.role !== "ADMIN") {
+    if (!full.isAdmin && full.role !== "ADMIN" && full.role !== "MASTER") {
       return jsonErr("FORBIDDEN", "Você não tem acesso como Admin.", 403);
     }
     return jsonOkWithSession({ role: "ADMIN" as const }, sessionPayload, "ADMIN");
   }
 
-  if (role === "STUDENT") {
-    if (!hasStudent) {
-      return jsonErr("FORBIDDEN", "Você não tem perfil de aluno.", 403);
+  if (role === "CUSTOMER") {
+    if (full.role !== "CUSTOMER") {
+      return jsonErr("FORBIDDEN", "Você não tem perfil de cliente.", 403);
     }
-    return jsonOkWithSession({ role: "STUDENT" as const }, sessionPayload, "STUDENT");
-  }
-
-  if (role === "TEACHER") {
-    if (!hasTeacher) {
-      return jsonErr("FORBIDDEN", "Você não tem perfil de professor.", 403);
-    }
-    return jsonOkWithSession({ role: "TEACHER" as const }, sessionPayload, "TEACHER");
+    return jsonOkWithSession({ role: "CUSTOMER" as const }, sessionPayload, "CUSTOMER");
   }
 
   return jsonErr("VALIDATION_ERROR", "Escolha inválida.", 400);

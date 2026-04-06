@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     if (existing.role === "ADMIN" || existing.role === "MASTER") {
       return jsonErr("EMAIL_IN_USE", "Já existe um usuário administrador com este e-mail.", 409);
     }
-    if (existing.role === "STUDENT" || existing.role === "TEACHER") {
+    if (existing.role === "CUSTOMER") {
       if (existing.isAdmin) {
         return jsonErr("EMAIL_IN_USE", "Este usuário já possui acesso como Admin.", 409);
       }
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
         {
           user: updated,
           emailSent: true,
-          alreadyRegisteredAs: existing.role === "STUDENT" ? "Aluno" : "Professor",
+          alreadyRegisteredAs: "Cliente",
         },
         { status: 200 }
       );

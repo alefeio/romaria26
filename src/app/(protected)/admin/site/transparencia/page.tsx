@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CloudinaryFileUpload } from "@/components/admin/CloudinaryFileUpload";
+import { FileUploadField } from "@/components/admin/FileUploadField";
 import { SortableTableRows, SortableTableDndWrapper } from "@/components/admin/SortableTableRows";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { Badge } from "@/components/ui/Badge";
@@ -442,7 +442,7 @@ export default function TransparenciaPage() {
           <div>
             <label className="text-sm font-medium">URL do arquivo (PDF)</label>
             <Input className="mt-1" value={docFileUrl} onChange={(e) => setDocFileUrl(e.target.value)} placeholder="https://..." />
-            <CloudinaryFileUpload
+            <FileUploadField
               kind="transparency"
               id={docEditing?.id}
               currentUrl={docFileUrl || undefined}

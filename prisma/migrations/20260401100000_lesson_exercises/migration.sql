@@ -26,3 +26,5 @@ CREATE INDEX "CourseLessonExercise_lessonId_idx" ON "CourseLessonExercise"("less
 
 ALTER TABLE "CourseLessonExercise" ADD CONSTRAINT "CourseLessonExercise_lessonId_fkey" FOREIGN KEY ("lessonId") REFERENCES "CourseLesson"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "CourseLessonExerciseOption" ADD CONSTRAINT "CourseLessonExerciseOption_exerciseId_fkey" FOREIGN KEY ("exerciseId") REFERENCES "CourseLessonExercise"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+CREATE INDEX "CourseLessonExerciseOption_exerciseId_idx" ON "CourseLessonExerciseOption"("exerciseId");

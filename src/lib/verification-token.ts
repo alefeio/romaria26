@@ -18,11 +18,9 @@ export function generateSecureToken(): string {
 export async function createVerificationToken(params: {
   userId: string;
   type: VerificationTokenType;
-  studentId?: string | null;
-  enrollmentId?: string | null;
   expiresInDays?: number;
 }): Promise<{ token: string; expiresAt: Date }> {
-  const { userId, type, studentId, enrollmentId, expiresInDays = EXPIRY_DAYS } = params;
+  const { userId, type, expiresInDays = EXPIRY_DAYS } = params;
   const token = generateSecureToken();
   const tokenHash = hashToken(token);
   const expiresAt = new Date();
@@ -31,8 +29,6 @@ export async function createVerificationToken(params: {
   await prisma.verificationToken.create({
     data: {
       userId,
-      studentId: studentId ?? undefined,
-      enrollmentId: enrollmentId ?? undefined,
       type,
       tokenHash,
       expiresAt,
@@ -45,7 +41,7 @@ export async function createVerificationToken(params: {
 export async function consumeVerificationToken(params: {
   rawToken: string;
   type: VerificationTokenType;
-}): Promise<{ userId: string; studentId: string | null; enrollmentId: string | null } | null> {
+}): Promise<{ userId: string } | null> {
   const { rawToken, type } = params;
   const tokenHash = hashToken(rawToken);
 
@@ -56,7 +52,7 @@ export async function consumeVerificationToken(params: {
       usedAt: null,
       expiresAt: { gt: new Date() },
     },
-    select: { id: true, userId: true, studentId: true, enrollmentId: true },
+    select: { id: true, userId: true },
   });
 
   if (!record) return null;
@@ -68,21 +64,19 @@ export async function consumeVerificationToken(params: {
 
   return {
     userId: record.userId,
-    studentId: record.studentId,
-    enrollmentId: record.enrollmentId,
   };
 }
 
 export async function findTokenByRaw(params: {
   rawToken: string;
   type: VerificationTokenType;
-}): Promise<{ valid: boolean; userId?: string; studentId?: string | null; enrollmentId?: string | null }> {
+}): Promise<{ valid: boolean; userId?: string }> {
   const { rawToken, type } = params;
   const tokenHash = hashToken(rawToken);
 
   const record = await prisma.verificationToken.findFirst({
     where: { type, tokenHash },
-    select: { userId: true, studentId: true, enrollmentId: true, usedAt: true, expiresAt: true },
+    select: { userId: true, usedAt: true, expiresAt: true },
   });
 
   if (!record) return { valid: false };
@@ -91,7 +85,5 @@ export async function findTokenByRaw(params: {
   return {
     valid: true,
     userId: record.userId,
-    studentId: record.studentId ?? undefined,
-    enrollmentId: record.enrollmentId ?? undefined,
   };
 }

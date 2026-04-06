@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Container, ImageCarousel } from "@/components/site";
-import { getNewsPostBySlug, getNewsPostsForSite } from "@/lib/site-data";
+import { getNewsPostBySlug, getNewsPostsForSite, getSiteSettings } from "@/lib/site-data";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -12,9 +12,10 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const post = await getNewsPostBySlug(slug);
-  if (!post) return { title: "Notícia | IGH" };
-  return { title: `${post.title} | IGH`, description: post.excerpt ?? undefined };
+  const [post, settings] = await Promise.all([getNewsPostBySlug(slug), getSiteSettings()]);
+  const name = settings?.siteName?.trim() || "Site";
+  if (!post) return { title: `Notícia | ${name}` };
+  return { title: `${post.title} | ${name}`, description: post.excerpt ?? undefined };
 }
 
 export default async function NoticiaSlugPage({ params }: Props) {

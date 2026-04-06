@@ -1,11 +1,15 @@
+import type { Metadata } from "next";
 import { PageHeader, Section, Card, Button } from "@/components/site";
-import { getProjectsForSite } from "@/lib/site-data";
+import { getProjectsForSite, getSiteSettings } from "@/lib/site-data";
 
-export const metadata = {
-  title: "Projetos | Instituto Gustavo Hessel",
-  description: "Conheça os projetos do IGH: CRC, Computadores para Inclusão, Doações e Entregas.",
-  openGraph: { title: "Projetos | IGH", description: "CRC, Computadores para Inclusão, Doações e Entregas." },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const s = await getSiteSettings();
+  const name = s?.siteName?.trim() || "Site";
+  const description =
+    s?.seoDescriptionDefault?.trim() || `Projetos e ações de inclusão e sustentabilidade de ${name}.`;
+  const title = `Projetos | ${name}`;
+  return { title, description, openGraph: { title, description } };
+}
 
 export default async function ProjetosPage() {
   const projects = await getProjectsForSite();
