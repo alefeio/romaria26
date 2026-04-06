@@ -20,6 +20,7 @@ export function getSiteUploadFolder(
   kind:
     | "logo"
     | "favicon"
+    | "opengraph"
     | "banners"
     | "partners"
     | "projects"

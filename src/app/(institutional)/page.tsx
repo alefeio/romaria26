@@ -29,11 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const description =
     settings?.seoDescriptionDefault?.trim() ||
     "Passeios, projetos e notícias. Reserve online e acompanhe nossas ações.";
-  return {
-    title,
-    description,
-    openGraph: { title, description },
-  };
+  return { title, description };
 }
 
 export default async function HomePage() {

@@ -1,7 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { Navbar, Footer, FloatingChatWidget } from "@/components/site";
 import { getSessionUserFromCookie } from "@/lib/auth";
-import { getMetadataBase, siteIconsFromSettings } from "@/lib/site-metadata";
+import { getMetadataBase, resolvePublicAssetUrl, siteIconsFromSettings } from "@/lib/site-metadata";
 import { getMenuItems, getSiteSettings } from "@/lib/site-data";
 
 function absoluteUrl(pathOrUrl: string, baseUrl: string): string {
@@ -25,17 +25,35 @@ export async function generateMetadata() {
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
   const metadataBase = getMetadataBase();
 
-  const openGraph: { title: string; description: string; images?: { url: string; width?: number; height?: number; alt?: string }[] } = {
-    title: settings?.seoTitleDefault?.trim() || siteName,
-    description: settings?.seoDescriptionDefault?.trim() || defaultDescription,
-  };
+  const ogTitle =
+    settings?.socialShareTitle?.trim() || settings?.seoTitleDefault?.trim() || siteName;
+  const ogDescription =
+    settings?.socialShareDescription?.trim() ||
+    settings?.seoDescriptionDefault?.trim() ||
+    defaultDescription;
+
+  const shareImageResolved = resolvePublicAssetUrl(settings?.socialShareImageUrl ?? null);
   const logoUrl = settings?.logoUrl?.trim();
-  if (logoUrl) {
-    const imageUrl = logoUrl.startsWith("http") ? logoUrl : (baseUrl ? absoluteUrl(logoUrl, baseUrl) : null);
-    if (imageUrl) {
-      openGraph.images = [{ url: imageUrl, width: 1200, height: 630, alt: siteName }];
-    }
-  }
+  const logoAbsolute = logoUrl
+    ? logoUrl.startsWith("http")
+      ? logoUrl
+      : baseUrl
+        ? absoluteUrl(logoUrl, baseUrl)
+        : null
+    : null;
+  const ogImageUrl = shareImageResolved || logoAbsolute;
+
+  const openGraph: {
+    title: string;
+    description: string;
+    images?: { url: string; width?: number; height?: number; alt?: string }[];
+  } = {
+    title: ogTitle,
+    description: ogDescription,
+    ...(ogImageUrl
+      ? { images: [{ url: ogImageUrl, width: 1200, height: 630, alt: siteName }] }
+      : {}),
+  };
 
   return {
     ...(metadataBase ? { metadataBase } : {}),
@@ -46,7 +64,12 @@ export async function generateMetadata() {
     description,
     icons: siteIconsFromSettings(settings),
     openGraph,
-    twitter: { card: "summary_large_image", title: openGraph.title, description: openGraph.description },
+    twitter: {
+      card: "summary_large_image",
+      title: ogTitle,
+      description: ogDescription,
+      ...(ogImageUrl ? { images: [ogImageUrl] } : {}),
+    },
   };
 }
 

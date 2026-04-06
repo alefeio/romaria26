@@ -75,6 +75,9 @@ export async function getSiteSettings(): Promise<SiteSettingsPublic | null> {
     socialLinkedin: s.socialLinkedin,
     seoTitleDefault: s.seoTitleDefault,
     seoDescriptionDefault: s.seoDescriptionDefault,
+    socialShareTitle: s.socialShareTitle,
+    socialShareDescription: s.socialShareDescription,
+    socialShareImageUrl: s.socialShareImageUrl,
   };
   } catch {
     return null;

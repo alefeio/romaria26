@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 export type SiteUploadKind =
   | "logo"
   | "favicon"
+  | "opengraph"
   | "banners"
   | "partners"
   | "projects"

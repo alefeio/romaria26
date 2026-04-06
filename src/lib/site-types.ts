@@ -26,4 +26,7 @@ export type SiteSettingsPublic = {
   socialLinkedin: string | null;
   seoTitleDefault: string | null;
   seoDescriptionDefault: string | null;
+  socialShareTitle: string | null;
+  socialShareDescription: string | null;
+  socialShareImageUrl: string | null;
 };

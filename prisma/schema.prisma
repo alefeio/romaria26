@@ -159,6 +159,10 @@ model SiteSettings {
   socialLinkedin        String?
   seoTitleDefault       String?
   seoDescriptionDefault String?
+  /// Open Graph / compartilhamento (WhatsApp, Facebook, etc.); se vazio, usa SEO padrão / logo.
+  socialShareTitle       String?
+  socialShareDescription String? @db.Text
+  socialShareImageUrl    String?
   publicAppUrl          String?
   updatedAt             DateTime @updatedAt
   addresses             Json?

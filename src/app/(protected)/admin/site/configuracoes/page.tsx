@@ -27,6 +27,9 @@ type Settings = {
   socialLinkedin: string | null;
   seoTitleDefault: string | null;
   seoDescriptionDefault: string | null;
+  socialShareTitle: string | null;
+  socialShareDescription: string | null;
+  socialShareImageUrl: string | null;
   /** Base para links em e-mails (campanhas): {link}, {link_area_aluno} */
   publicAppUrl: string | null;
 };
@@ -96,6 +99,9 @@ export default function ConfiguracoesPage() {
         socialLinkedin: empty(s.socialLinkedin),
         seoTitleDefault: empty(s.seoTitleDefault),
         seoDescriptionDefault: empty(s.seoDescriptionDefault),
+        socialShareTitle: empty((s as Settings).socialShareTitle),
+        socialShareDescription: empty((s as Settings).socialShareDescription),
+        socialShareImageUrl: empty((s as Settings).socialShareImageUrl),
         publicAppUrl: empty((s as Settings).publicAppUrl),
       });
       setAddresses(addrs.map((a: AddressEntry) => ({ ...a })));
@@ -410,6 +416,50 @@ export default function ConfiguracoesPage() {
                 rows={3}
                 value={form.seoDescriptionDefault ?? ""}
                 onChange={(e) => setForm((f) => ({ ...f, seoDescriptionDefault: e.target.value }))}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">Compartilhamento social (WhatsApp, Facebook, etc.)</div>
+          <div className="card-body flex flex-col gap-3">
+            <p className="text-sm text-[var(--text-muted)]">
+              Define o título, a descrição e a imagem da pré-visualização quando alguém compartilha o link do site. Se
+              deixar em branco, usamos o SEO padrão e, na imagem, a logo do site.
+            </p>
+            <div>
+              <label className="text-sm font-medium">Título (Open Graph)</label>
+              <Input
+                className="mt-1"
+                value={form.socialShareTitle ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, socialShareTitle: e.target.value }))}
+                placeholder="Ex.: Romaria Fluvial Muiraquitã — Círio de Nazaré"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Descrição (Open Graph)</label>
+              <textarea
+                className="mt-1 w-full rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-sm"
+                rows={3}
+                value={form.socialShareDescription ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, socialShareDescription: e.target.value }))}
+                placeholder="Texto curto que aparece abaixo do título na pré-visualização."
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">URL da imagem (recomendado 1200×630 px)</label>
+              <Input
+                className="mt-1"
+                value={form.socialShareImageUrl ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, socialShareImageUrl: e.target.value }))}
+                placeholder="https://..."
+              />
+              <ImageUploadField
+                kind="opengraph"
+                currentUrl={form.socialShareImageUrl || undefined}
+                onUploaded={(url) => setForm((f) => ({ ...f, socialShareImageUrl: url }))}
+                label="Ou envie uma imagem"
               />
             </div>
           </div>

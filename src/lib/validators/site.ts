@@ -58,6 +58,9 @@ export const siteSettingsSchema = z.object({
   socialLinkedin: z.string().optional(),
   seoTitleDefault: z.string().optional(),
   seoDescriptionDefault: z.string().optional(),
+  socialShareTitle: z.string().optional(),
+  socialShareDescription: z.string().optional(),
+  socialShareImageUrl: z.string().url().optional().or(z.literal("")),
   publicAppUrl: z.union([z.literal(""), z.string().url("URL inválida (use https://...)")]).optional(),
 });
 
