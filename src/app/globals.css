@@ -3,6 +3,7 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --navbar-bg: var(--background);
   /* IGH institucional */
   --igh-primary: #0066b3;
   --igh-primary-hover: #005090;
@@ -40,6 +41,7 @@
 html[data-theme="dark"] {
   --background: #0f0f0f;
   --foreground: #fafafa;
+  --navbar-bg: var(--background);
   --igh-surface: #18181b;
   --igh-border: #3f3f46;
   --igh-muted: #a1a1aa;

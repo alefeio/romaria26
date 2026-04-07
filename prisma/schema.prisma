@@ -149,6 +149,8 @@ model SiteSettings {
   faviconUrl            String?
   primaryColor          String?
   secondaryColor        String?
+  /// Fundo do menu (barra superior); se vazio, usa o fundo do tema (--background).
+  menuBackgroundColor   String?
   contactEmail          String?
   contactPhone          String?
   contactWhatsapp       String?

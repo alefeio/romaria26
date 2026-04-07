@@ -15,6 +15,7 @@ export type SiteSettingsPublic = {
   faviconUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
+  menuBackgroundColor: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
   contactWhatsapp: string | null;

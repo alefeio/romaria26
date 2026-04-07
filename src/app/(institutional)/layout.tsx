@@ -93,6 +93,9 @@ export default async function InstitutionalLayout({
     cssVars.push(`--igh-secondary: ${settings.secondaryColor}`);
     cssVars.push(`--igh-secondary-solid: ${settings.secondaryColor}`);
   }
+  if (settings?.menuBackgroundColor?.trim()) {
+    cssVars.push(`--navbar-bg: ${settings.menuBackgroundColor.trim()}`);
+  }
   const styleContent = cssVars.length > 0 ? `:root { ${cssVars.join("; ")} }` : "";
 
   return (

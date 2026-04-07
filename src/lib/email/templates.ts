@@ -139,7 +139,7 @@ export function templateStudentRegistered(params: {
 </ul>
 <p><strong>Para sua matrícula ser concluída</strong>, após fazer login você deve:</p>
 <ol>
-  <li>Acessar a área do aluno e ir em <strong>Meus dados</strong> (<a href="${meusDadosUrl}">${meusDadosUrl}</a>).</li>
+  <li>Acessar a Área do Cliente e ir em <strong>Meus dados</strong> (<a href="${meusDadosUrl}">${meusDadosUrl}</a>).</li>
   <li>Completar todos os dados restantes do cadastro (endereço, documento, etc.).</li>
   <li>Anexar o <strong>documento de identidade</strong> e o <strong>comprovante de residência</strong>.</li>
 </ol>

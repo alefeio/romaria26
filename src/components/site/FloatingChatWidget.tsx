@@ -36,15 +36,15 @@ function buildWhatsAppHref(contactWhatsapp: string | null | undefined): string |
 
 function welcomeMessage(siteLabel: string) {
   const extra = siteLabel.trim() ? ` de ${siteLabel.trim()}` : "";
-  return `Olá! Sou a Nina, atendente virtual${extra}. O que você precisa? Escolha uma opção abaixo.`;
+  return `Olá! Sou a Mari, atendente virtual${extra}. O que você precisa? Escolha uma opção abaixo.`;
 }
 
-/** Âncora para abrir o chat via link (ex.: banner). Use o link /#nina ou qualquer página + #nina */
-export const CHAT_OPEN_HASH = "nina";
+/** Âncora para abrir o chat via link (ex.: banner). Use o link /#Mari ou qualquer página + #Mari */
+export const CHAT_OPEN_HASH = "Mari";
 
 function TypingDots() {
   return (
-    <div className="flex items-center justify-start gap-1 px-3 py-2" aria-live="polite" aria-label="Nina está digitando">
+    <div className="flex items-center justify-start gap-1 px-3 py-2" aria-live="polite" aria-label="Mari está digitando">
       <div className="flex gap-1 rounded-lg bg-[var(--igh-surface)] px-3 py-2.5">
         <span
           className="h-2 w-2 rounded-full bg-[var(--igh-primary)] animate-bounce"
@@ -278,7 +278,7 @@ export function FloatingChatWidget({
             </div>
             <div className="min-w-0 flex-1">
               <span className="block font-semibold text-[var(--text-primary)] text-sm sm:text-base truncate">
-                Nina
+                Mari
               </span>
               <span className="block text-xs text-[var(--text-muted)] truncate">
                 Atendente Virtual

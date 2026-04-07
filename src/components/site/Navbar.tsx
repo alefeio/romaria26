@@ -64,14 +64,16 @@ export function Navbar({ menuItems: propItems, settings, sessionUser }: NavbarPr
       {scrolled && headerHeight > 0 && <div aria-hidden className="shrink-0" style={{ height: headerHeight }} />}
       <header
         ref={headerRef}
-        className={`z-40 border-b border-[var(--igh-border)] bg-[var(--background)] backdrop-blur transition-shadow ${scrolled ? "fixed left-0 right-0 top-0 shadow-md" : "sticky top-0"}`}
+        className={`z-40 border-b border-[var(--igh-border)] bg-[var(--navbar-bg)] backdrop-blur transition-shadow ${scrolled ? "fixed left-0 right-0 top-0 shadow-md" : "sticky top-0"}`}
       >
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8" aria-label="Menu principal">
         <Link href="/" className="flex shrink-0 items-center rounded focus:ring-2 focus:ring-[var(--igh-primary)] focus:ring-offset-2">
           {logoUrl ? (
-            <span className={`inline-block rounded-lg bg-white transition-[padding] ${scrolled ? "p-1" : "p-2"}`}>
-              <img src={logoUrl} alt={settings?.siteName ?? "Logo"} className={`w-auto object-contain transition-[height] ${scrolled ? "h-7 sm:h-8" : "h-10 sm:h-12"}`} />
-            </span>
+            <img
+              src={logoUrl}
+              alt={settings?.siteName ?? "Logo"}
+              className={`w-auto object-contain transition-[height] ${scrolled ? "h-7 sm:h-8" : "h-10 sm:h-12"}`}
+            />
           ) : (
             <span className="text-xl font-bold text-[var(--igh-primary)]">{siteTitle}</span>
           )}
@@ -120,11 +122,11 @@ export function Navbar({ menuItems: propItems, settings, sessionUser }: NavbarPr
                 className={sessionUser.role === "STUDENT"
                   ? "rounded-md bg-[var(--igh-primary)] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[var(--igh-primary-hover)]"
                   : "flex h-8 w-8 items-center justify-center rounded-md bg-[var(--igh-primary)] text-white hover:bg-[var(--igh-primary-hover)]"}
-                aria-label={sessionUser.role === "STUDENT" ? "Área do aluno" : "Painel"}
-                title={sessionUser.role === "STUDENT" ? "Área do aluno" : "Painel"}
+                aria-label={sessionUser.role === "STUDENT" ? "Área do Cliente" : "Painel"}
+                title={sessionUser.role === "STUDENT" ? "Área do Cliente" : "Painel"}
               >
                 {sessionUser.role === "STUDENT" ? (
-                  "Área do aluno"
+                  "Área do Cliente"
                 ) : (
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -134,7 +136,7 @@ export function Navbar({ menuItems: propItems, settings, sessionUser }: NavbarPr
             </div>
           ) : (
             <Link href="/login" className="ml-2 rounded-lg bg-[var(--igh-accent)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--igh-accent-hover)] min-h-[44px] inline-flex items-center justify-center">
-              Área do Aluno
+              Área do Cliente
             </Link>
           )}
         </div>
@@ -143,7 +145,7 @@ export function Navbar({ menuItems: propItems, settings, sessionUser }: NavbarPr
         </button>
       </nav>
       {open && (
-        <div className="border-t border-[var(--igh-border)] bg-[var(--card-bg)] px-4 py-4 md:hidden">
+        <div className="border-t border-[var(--igh-border)] bg-[var(--navbar-bg)] px-4 py-4 md:hidden">
           {links.map((l) => (
             <div key={l.id}>
               <Link href={l.href} className="block py-2 text-[var(--igh-secondary)]" onClick={() => setOpen(false)}>{l.label}</Link>
@@ -158,7 +160,7 @@ export function Navbar({ menuItems: propItems, settings, sessionUser }: NavbarPr
               <>
                 <span className="truncate text-xs text-[var(--text-muted)]" title={sessionUser.email}>{sessionUser.name}</span>
                 <Link href={sessionUser.role === "STUDENT" ? "/minhas-turmas" : "/dashboard"} className="inline-flex items-center gap-2 rounded-lg bg-[var(--igh-primary)] px-4 py-2 text-sm font-semibold text-white" onClick={() => setOpen(false)}>
-                  {sessionUser.role === "STUDENT" ? "Área do aluno" : (
+                  {sessionUser.role === "STUDENT" ? "Área do Cliente" : (
                     <>
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                       Painel
@@ -167,7 +169,7 @@ export function Navbar({ menuItems: propItems, settings, sessionUser }: NavbarPr
                 </Link>
               </>
             ) : (
-              <Link href="/login" className="rounded-lg bg-[var(--igh-accent)] px-4 py-2 text-sm font-semibold text-white" onClick={() => setOpen(false)}>Área do Aluno</Link>
+              <Link href="/login" className="rounded-lg bg-[var(--igh-accent)] px-4 py-2 text-sm font-semibold text-white" onClick={() => setOpen(false)}>Área do Cliente</Link>
             )}
           </div>
         </div>

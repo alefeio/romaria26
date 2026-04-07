@@ -38,6 +38,7 @@ export const siteSettingsSchema = z.object({
   faviconUrl: z.string().url().optional().or(z.literal("")),
   primaryColor: z.string().optional(),
   secondaryColor: z.string().optional(),
+  menuBackgroundColor: z.string().optional(),
   contactEmail: z.string().email().optional().or(z.literal("")),
   contactPhone: z.string().optional(),
   contactWhatsapp: z.string().optional(),

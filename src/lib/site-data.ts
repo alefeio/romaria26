@@ -64,6 +64,7 @@ export async function getSiteSettings(): Promise<SiteSettingsPublic | null> {
     faviconUrl: s.faviconUrl,
     primaryColor: s.primaryColor,
     secondaryColor: s.secondaryColor,
+    menuBackgroundColor: s.menuBackgroundColor,
     contactEmail: s.contactEmail,
     contactPhone: s.contactPhone,
     contactWhatsapp: s.contactWhatsapp,

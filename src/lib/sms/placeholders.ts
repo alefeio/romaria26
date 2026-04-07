@@ -23,7 +23,7 @@ export interface PlaceholderData {
   horario?: string;
   /** Local da turma */
   local?: string;
-  /** Link para área do aluno (igual a {link} se não informado) */
+  /** Link para Área do Cliente (igual a {link} se não informado) */
   link_area_aluno?: string;
   /** Link para área do cliente (reservas Romaria) */
   link_area_cliente?: string;

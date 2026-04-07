@@ -16,6 +16,7 @@ type Settings = {
   faviconUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
+  menuBackgroundColor: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
   contactWhatsapp: string | null;
@@ -89,6 +90,7 @@ export default function ConfiguracoesPage() {
         faviconUrl: empty(s.faviconUrl),
         primaryColor: empty(s.primaryColor),
         secondaryColor: empty(s.secondaryColor),
+        menuBackgroundColor: empty((s as Settings).menuBackgroundColor),
         contactEmail: empty(s.contactEmail),
         contactPhone: empty(s.contactPhone),
         contactWhatsapp: empty(s.contactWhatsapp),
@@ -251,6 +253,18 @@ export default function ConfiguracoesPage() {
                   placeholder="#1a365d"
                 />
               </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Cor de fundo do menu (hex)</label>
+              <Input
+                className="mt-1"
+                value={form.menuBackgroundColor ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, menuBackgroundColor: e.target.value }))}
+                placeholder="#ffffff (vazio = fundo do tema claro/escuro)"
+              />
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                Barra superior do site. Se vazio, usa o fundo da página (tema claro ou escuro).
+              </p>
             </div>
           </div>
         </div>
