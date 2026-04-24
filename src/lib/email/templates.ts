@@ -3,7 +3,7 @@ import "server-only";
 import { getAppUrl } from "./index";
 
 const TERMS_VERSION = "v1-2026-02";
-const COMPANY_NAME = "Instituto Gustavo Hessel";
+const COMPANY_NAME = "Romaria Fluvial Muiraquitã";
 
 function getLogoUrl(): string {
   return getAppUrl("/images/logo.png");
@@ -146,7 +146,7 @@ export function templateStudentRegistered(params: {
 <p>Somente após o envio desses dados e anexos sua matrícula poderá ser confirmada pela equipe. Troque a senha no primeiro acesso e guarde esta mensagem em local seguro.</p>
 <p>Quando sua pré-matrícula for confirmada, você receberá outro e-mail com os dados do curso.</p>
 `;
-  return { subject: "Cadastro realizado - Instituto Gustavo Hessel", html: wrapHtml(body) };
+  return { subject: "Cadastro realizado - Romaria Fluvial Muiraquitã", html: wrapHtml(body) };
 }
 
 /** E-mail quando um usuário existente (ex.: admin ou professor) recebe o perfil de aluno. Não inclui senha; usa o login atual. */
@@ -265,7 +265,7 @@ export function templatePasswordReset(params: { name: string; resetUrl: string }
 </td></tr></table>
 <p>Se você não solicitou essa alteração, ignore este e-mail. O link expira em 24 horas.</p>
 `;
-  return { subject: "Redefinição de senha - Instituto Gustavo Hessel", html: wrapHtml(body) };
+  return { subject: "Redefinição de senha - Romaria Fluvial Muiraquitã", html: wrapHtml(body) };
 }
 
 /** E-mail de confirmação de abertura de chamado de suporte. */

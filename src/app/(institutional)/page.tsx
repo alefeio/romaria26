@@ -118,6 +118,7 @@ export default async function HomePage() {
                   boardingLocation={p.boardingLocation}
                   coverImageUrl={p.coverImageUrl}
                   remainingPlaces={p.remainingPlaces}
+                  status={p.status}
                 />
               </li>
             ))}

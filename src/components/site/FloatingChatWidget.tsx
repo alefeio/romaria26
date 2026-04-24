@@ -39,8 +39,9 @@ function welcomeMessage(siteLabel: string) {
   return `Olá! Sou a Mari, atendente virtual${extra}. O que você precisa? Escolha uma opção abaixo.`;
 }
 
-/** Âncora para abrir o chat via link (ex.: banner). Use o link /#Mari ou qualquer página + #Mari */
-export const CHAT_OPEN_HASH = "Mari";
+/** Âncora para abrir o chat via link (ex.: banner). Use o link /#mari (ou o legado /#nina). */
+export const CHAT_OPEN_HASH = "mari";
+const LEGACY_CHAT_OPEN_HASHES = ["mari", "nina"] as const;
 
 function TypingDots() {
   return (
@@ -109,9 +110,10 @@ export function FloatingChatWidget({
   }, [isOpen, fetchContext]);
 
   useEffect(() => {
-    const hash = `#${CHAT_OPEN_HASH}`;
     const openIfHash = () => {
-      if (typeof window !== "undefined" && window.location.hash === hash) setIsOpen(true);
+      if (typeof window === "undefined") return;
+      const raw = window.location.hash.replace(/^#/, "");
+      if (LEGACY_CHAT_OPEN_HASHES.includes(raw as (typeof LEGACY_CHAT_OPEN_HASHES)[number])) setIsOpen(true);
     };
     openIfHash();
     window.addEventListener("hashchange", openIfHash);
@@ -234,7 +236,10 @@ export function FloatingChatWidget({
     setView("initial");
     setMessages([{ id: "0", role: "bot", content: welcomeMessage(siteLabel) }]);
     setIsTyping(false);
-    if (typeof window !== "undefined" && window.location.hash === `#${CHAT_OPEN_HASH}`) {
+    if (
+      typeof window !== "undefined" &&
+      LEGACY_CHAT_OPEN_HASHES.includes(window.location.hash.replace(/^#/, "") as (typeof LEGACY_CHAT_OPEN_HASHES)[number])
+    ) {
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
     }
   }, [siteLabel]);

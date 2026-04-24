@@ -18,13 +18,19 @@ export async function getRomariaAdminDashboard(): Promise<{
   packagesTotal: number;
   reservationsPending: number;
   reservationsTotal: number;
+  paymentsDueToday: number;
   recentReservations: RomariaRecentReservation[];
 }> {
-  const [packagesOpen, packagesTotal, reservationsPending, reservationsTotal, recentRaw] = await Promise.all([
+  const today = new Date().toISOString().slice(0, 10);
+  const start = new Date(today + "T00:00:00.000Z");
+  const end = new Date(today + "T23:59:59.999Z");
+
+  const [packagesOpen, packagesTotal, reservationsPending, reservationsTotal, paymentsDueToday, recentRaw] = await Promise.all([
     prisma.package.count({ where: { isActive: true, status: "OPEN" } }),
     prisma.package.count(),
     prisma.reservation.count({ where: { status: "PENDING" } }),
     prisma.reservation.count(),
+    prisma.reservationInstallment.count({ where: { status: "SCHEDULED", dueDate: { gte: start, lte: end } } }),
     prisma.reservation.findMany({
       take: 10,
       orderBy: { reservedAt: "desc" },
@@ -51,6 +57,7 @@ export async function getRomariaAdminDashboard(): Promise<{
     packagesTotal,
     reservationsPending,
     reservationsTotal,
+    paymentsDueToday,
     recentReservations,
   };
 }

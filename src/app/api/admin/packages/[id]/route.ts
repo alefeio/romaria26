@@ -27,6 +27,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
     item: {
       ...item,
       price: item.price.toString(),
+      childPrice: item.childPrice.toString(),
       breakfastKitPrice: item.breakfastKitPrice.toString(),
     },
   });
@@ -66,8 +67,10 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
         ...(d.description !== undefined ? { description: d.description?.trim() || null } : {}),
         ...(d.shortDescription !== undefined ? { shortDescription: d.shortDescription?.trim() || null } : {}),
         ...(d.price !== undefined ? { price: new Prisma.Decimal(d.price) } : {}),
+        ...(d.childPrice !== undefined ? { childPrice: new Prisma.Decimal(d.childPrice) } : {}),
         ...(d.breakfastKitAvailable !== undefined ? { breakfastKitAvailable: d.breakfastKitAvailable } : {}),
         ...(d.breakfastKitPrice !== undefined ? { breakfastKitPrice: new Prisma.Decimal(d.breakfastKitPrice) } : {}),
+        ...(d.kitsDeliveryInfo !== undefined ? { kitsDeliveryInfo: d.kitsDeliveryInfo?.trim() || null } : {}),
         ...(d.departureDate !== undefined ? { departureDate: departureDateFromYmd(d.departureDate) } : {}),
         ...(d.departureTime !== undefined ? { departureTime: d.departureTime.trim() } : {}),
         ...(d.boardingLocation !== undefined ? { boardingLocation: d.boardingLocation.trim() } : {}),
@@ -82,6 +85,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
       item: {
         ...item,
         price: item.price.toString(),
+        childPrice: item.childPrice.toString(),
         breakfastKitPrice: item.breakfastKitPrice.toString(),
       },
     });

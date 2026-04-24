@@ -416,8 +416,10 @@ export type PackagePublicListItem = {
   shortDescription: string | null;
   description: string | null;
   price: string;
+  childPrice: string;
   breakfastKitAvailable: boolean;
   breakfastKitPrice: string;
+  kitsDeliveryInfo: string | null;
   departureDate: Date;
   departureTime: string;
   boardingLocation: string;
@@ -435,8 +437,10 @@ async function toPackagePublicListItem(p: {
   shortDescription: string | null;
   description: string | null;
   price: { toString(): string };
+  childPrice: { toString(): string };
   breakfastKitAvailable: boolean;
   breakfastKitPrice: { toString(): string };
+  kitsDeliveryInfo: string | null;
   departureDate: Date;
   departureTime: string;
   boardingLocation: string;
@@ -453,8 +457,10 @@ async function toPackagePublicListItem(p: {
     shortDescription: p.shortDescription,
     description: p.description,
     price: p.price.toString(),
+    childPrice: p.childPrice.toString(),
     breakfastKitAvailable: p.breakfastKitAvailable,
     breakfastKitPrice: p.breakfastKitPrice.toString(),
+    kitsDeliveryInfo: p.kitsDeliveryInfo,
     departureDate: p.departureDate,
     departureTime: p.departureTime,
     boardingLocation: p.boardingLocation,
@@ -469,7 +475,8 @@ async function toPackagePublicListItem(p: {
 export async function getPackagesForPublicSite(): Promise<PackagePublicListItem[]> {
   try {
     const rows = await prisma.package.findMany({
-      where: { isActive: true, status: "OPEN" },
+      // No site público: mostrar apenas (Em breve / Aberto / Esgotado). Encerrado não aparece.
+      where: { isActive: true, status: { in: ["OPEN", "SOLD_OUT", "SOON"] } },
       orderBy: [{ departureDate: "asc" }, { name: "asc" }],
     });
     return Promise.all(rows.map((p) => toPackagePublicListItem(p)));
@@ -481,7 +488,7 @@ export async function getPackagesForPublicSite(): Promise<PackagePublicListItem[
 export async function getPackageBySlugForPublic(slug: string): Promise<PackagePublicListItem | null> {
   try {
     const p = await prisma.package.findFirst({
-      where: { slug, isActive: true, status: "OPEN" },
+      where: { slug, isActive: true, status: { in: ["OPEN", "SOLD_OUT"] } },
     });
     if (!p) return null;
     return toPackagePublicListItem(p);

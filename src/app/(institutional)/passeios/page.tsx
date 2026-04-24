@@ -21,9 +21,7 @@ export default async function PasseiosPage() {
       className="py-12"
     >
       {packages.length === 0 ? (
-        <p className="text-center text-[var(--igh-muted)]">
-          Nenhum passeio aberto para reserva no momento. Volte em breve ou entre em contato.
-        </p>
+        <p className="text-center text-[var(--igh-muted)]">Nenhum passeio disponível no momento. Volte em breve ou entre em contato.</p>
       ) : (
         <ul className="grid list-none gap-8 pl-0 sm:grid-cols-2 lg:grid-cols-3">
           {packages.map((p) => (
@@ -38,6 +36,7 @@ export default async function PasseiosPage() {
                 boardingLocation={p.boardingLocation}
                 coverImageUrl={p.coverImageUrl}
                 remainingPlaces={p.remainingPlaces}
+                status={p.status}
               />
             </li>
           ))}

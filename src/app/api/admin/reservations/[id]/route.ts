@@ -7,6 +7,56 @@ function isUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
 }
 
+export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdminApi();
+  if (auth instanceof Response) return auth;
+
+  const { id } = await ctx.params;
+  if (!isUuid(id)) return jsonErr("INVALID_ID", "ID inválido.", 400);
+
+  const r = await prisma.reservation.findUnique({
+    where: { id },
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+      package: { select: { id: true, name: true, slug: true, departureDate: true, departureTime: true, boardingLocation: true } },
+    },
+  });
+  if (!r) return jsonErr("NOT_FOUND", "Reserva não encontrada.", 404);
+
+  return jsonOk({
+    item: {
+      id: r.id,
+      userId: r.userId,
+      packageId: r.packageId,
+      customerNameSnapshot: r.customerNameSnapshot,
+      customerEmailSnapshot: r.customerEmailSnapshot,
+      customerPhoneSnapshot: r.customerPhoneSnapshot,
+      quantity: r.quantity,
+      adultsCount: r.adultsCount,
+      childrenCount: r.childrenCount,
+      adultShirtSizes: r.adultShirtSizes,
+      childrenShirtNumbers: r.childrenShirtNumbers,
+      breakfastKitSelections: r.breakfastKitSelections,
+      includesBreakfastKit: r.includesBreakfastKit,
+      totalPrice: r.totalPrice.toString(),
+      totalDue: r.totalDue.toString(),
+      totalPaid: r.totalPaid.toString(),
+      paymentStatus: r.paymentStatus,
+      status: r.status,
+      notes: r.notes,
+      kitsDeliveryInfoSnapshot: r.kitsDeliveryInfoSnapshot ?? null,
+      reservedAt: r.reservedAt.toISOString(),
+      confirmedAt: r.confirmedAt?.toISOString() ?? null,
+      createdAt: r.createdAt.toISOString(),
+      user: r.user,
+      package: {
+        ...r.package,
+        departureDate: r.package.departureDate.toISOString().slice(0, 10),
+      },
+    },
+  });
+}
+
 export async function PATCH(request: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAdminApi();
   if (auth instanceof Response) return auth;

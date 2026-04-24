@@ -26,13 +26,15 @@ type Item = {
   description: string | null;
   shortDescription: string | null;
   price: string;
+  childPrice: string;
   breakfastKitAvailable: boolean;
   breakfastKitPrice: string;
+  kitsDeliveryInfo: string | null;
   departureDate: string;
   departureTime: string;
   boardingLocation: string;
   capacity: number;
-  status: "DRAFT" | "OPEN" | "SOLD_OUT" | "CLOSED";
+  status: "DRAFT" | "SOON" | "OPEN" | "SOLD_OUT" | "CLOSED";
   coverImageUrl: string | null;
   galleryImages: string[];
   isActive: boolean;
@@ -52,8 +54,10 @@ export default function EditarPacotePage() {
   const [description, setDescription] = useState("");
   const [shortDescription, setShortDescription] = useState("");
   const [price, setPrice] = useState("0");
+  const [childPrice, setChildPrice] = useState("0");
   const [breakfastKitAvailable, setBreakfastKitAvailable] = useState(false);
   const [breakfastKitPrice, setBreakfastKitPrice] = useState("0");
+  const [kitsDeliveryInfo, setKitsDeliveryInfo] = useState("");
   const [departureDate, setDepartureDate] = useState("");
   const [departureTime, setDepartureTime] = useState("");
   const [boardingLocation, setBoardingLocation] = useState("");
@@ -81,8 +85,10 @@ export default function EditarPacotePage() {
       setDescription(p.description ?? "");
       setShortDescription(p.shortDescription ?? "");
       setPrice(p.price);
+      setChildPrice(p.childPrice ?? "0");
       setBreakfastKitAvailable(p.breakfastKitAvailable);
       setBreakfastKitPrice(p.breakfastKitPrice);
+      setKitsDeliveryInfo(p.kitsDeliveryInfo ?? "");
       const d = typeof p.departureDate === "string" ? p.departureDate : new Date(p.departureDate).toISOString();
       setDepartureDate(d.slice(0, 10));
       setDepartureTime(p.departureTime);
@@ -119,8 +125,10 @@ export default function EditarPacotePage() {
           description: description.trim() || null,
           shortDescription: shortDescription.trim() || null,
           price,
+          childPrice,
           breakfastKitAvailable,
           breakfastKitPrice,
+          kitsDeliveryInfo: kitsDeliveryInfo.trim() || null,
           departureDate,
           departureTime: departureTime.trim(),
           boardingLocation: boardingLocation.trim(),
@@ -196,13 +204,17 @@ export default function EditarPacotePage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium text-[var(--text-primary)]">Preço (R$)</label>
+            <label className="text-sm font-medium text-[var(--text-primary)]">Preço adulto (R$)</label>
             <Input required value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" />
           </div>
           <div>
-            <label className="text-sm font-medium text-[var(--text-primary)]">Capacidade</label>
-            <Input required type="number" min={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} className="mt-1" />
+            <label className="text-sm font-medium text-[var(--text-primary)]">Preço criança (R$)</label>
+            <Input required value={childPrice} onChange={(e) => setChildPrice(e.target.value)} className="mt-1" />
           </div>
+        </div>
+        <div>
+          <label className="text-sm font-medium text-[var(--text-primary)]">Capacidade</label>
+          <Input required type="number" min={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} className="mt-1" />
         </div>
         <label className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
           <input type="checkbox" checked={breakfastKitAvailable} onChange={(e) => setBreakfastKitAvailable(e.target.checked)} />
@@ -214,6 +226,16 @@ export default function EditarPacotePage() {
             <Input value={breakfastKitPrice} onChange={(e) => setBreakfastKitPrice(e.target.value)} className="mt-1" />
           </div>
         ) : null}
+        <div>
+          <label className="text-sm font-medium text-[var(--text-primary)]">Entrega dos kits (exibido na reserva)</label>
+          <textarea
+            rows={4}
+            value={kitsDeliveryInfo}
+            onChange={(e) => setKitsDeliveryInfo(e.target.value)}
+            placeholder="Ex.: Entrega dos kits no dia 10/10, 18h, na sede..."
+            className="mt-1 w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm"
+          />
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="text-sm font-medium text-[var(--text-primary)]">Data de saída</label>
@@ -236,6 +258,7 @@ export default function EditarPacotePage() {
             className="mt-1 w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm"
           >
             <option value="DRAFT">Rascunho</option>
+            <option value="SOON">Em breve</option>
             <option value="OPEN">Aberto</option>
             <option value="SOLD_OUT">Esgotado</option>
             <option value="CLOSED">Encerrado</option>

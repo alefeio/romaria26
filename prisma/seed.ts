@@ -5,9 +5,10 @@
  * Idempotente: usa upserts (slug único) ou cria só se a tabela estiver vazia.
  *
  * Variáveis opcionais:
- *   SEED_MASTER_EMAIL     (default: master@romariafluvial.local)
- *   SEED_MASTER_PASSWORD  (default: AlterarSenha123!)
+ *   SEED_MASTER_EMAIL     (default: romariafluvialads@gmail.com)
+ *   SEED_MASTER_PASSWORD  (default: Senha123!)
  *   SEED_FORCE_USERS=1    recria hash do master se já existir (opcional)
+ *   SEED_RESET_MASTER=1   remove todos os MASTER e recria (ou use: npm run reset:master)
  *
  * Executar: npm run seed  (ou npx prisma db seed)
  */
@@ -15,6 +16,7 @@ import { hash } from "bcryptjs";
 
 import { Prisma } from "../src/generated/prisma/client";
 import { prisma } from "../src/lib/prisma";
+import { deleteAllMasterUsers } from "./master-user-reset";
 
 const SITE_NAME = "Romaria Fluvial Muiraquitã";
 const SEO_TITLE = "Romaria Fluvial Muiraquitã no Círio de Nazaré | Pacotes e Reservas em Belém";
@@ -429,9 +431,35 @@ async function seedTransparency() {
 }
 
 async function seedMasterUser() {
-  const email = process.env.SEED_MASTER_EMAIL ?? "master@romariafluvial.local";
-  const plain = process.env.SEED_MASTER_PASSWORD ?? "AlterarSenha123!";
+  const email = (process.env.SEED_MASTER_EMAIL ?? "romariafluvialads@gmail.com").toLowerCase().trim();
+  const plain = process.env.SEED_MASTER_PASSWORD ?? "Senha123!";
   const passwordHash = await hash(plain, 10);
+
+  if (process.env.SEED_RESET_MASTER === "1") {
+    const removed = await deleteAllMasterUsers(prisma);
+    if (removed > 0) {
+      console.log(`SEED_RESET_MASTER: removido(s) ${removed} utilizador(es) MASTER.`);
+    }
+  }
+
+  const clash = await prisma.user.findUnique({ where: { email } });
+  if (clash && clash.role !== "MASTER") {
+    throw new Error(`E-mail ${email} já está em uso por outro perfil (${clash.role}). Ajuste SEED_MASTER_EMAIL.`);
+  }
+
+  const existingMaster = await prisma.user.findFirst({ where: { role: "MASTER" } });
+  if (existingMaster) {
+    await prisma.user.update({
+      where: { id: existingMaster.id },
+      data: {
+        email,
+        passwordHash,
+        mustChangePassword: false,
+      },
+    });
+    console.log(`User MASTER atualizado: ${email}`);
+    return;
+  }
 
   await prisma.user.upsert({
     where: { email },
@@ -441,15 +469,15 @@ async function seedMasterUser() {
       passwordHash,
       role: "MASTER",
       isActive: true,
-      mustChangePassword: true,
+      mustChangePassword: false,
       isAdmin: false,
     },
     update:
       process.env.SEED_FORCE_USERS === "1"
-        ? { passwordHash, mustChangePassword: true }
+        ? { passwordHash, mustChangePassword: false }
         : {},
   });
-  console.log(`User MASTER: ${email} (altere a senha após o primeiro login).`);
+  console.log(`User MASTER: ${email}`);
 }
 
 async function main() {

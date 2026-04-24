@@ -92,6 +92,16 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
       <Button type="submit" disabled={loading}>
         {loading ? "Entrando..." : "Entrar"}
       </Button>
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={() => {
+          const href = redirectTo ? `/cadastro?from=${encodeURIComponent(redirectTo)}` : "/cadastro";
+          router.push(href);
+        }}
+      >
+        Criar conta
+      </Button>
       <div className="text-center">
         <Link className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]" href="/esqueci-senha">
           Esqueci minha senha

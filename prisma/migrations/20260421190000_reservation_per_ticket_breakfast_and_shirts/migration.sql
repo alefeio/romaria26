@@ -1,0 +1,6 @@
+ALTER TABLE "Reservation"
+  ADD COLUMN "adultShirtSizes" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  ADD COLUMN "childrenShirtNumbers" INTEGER[] NOT NULL DEFAULT ARRAY[]::INTEGER[],
+  ADD COLUMN "breakfastSelections" BOOLEAN[] NOT NULL DEFAULT ARRAY[]::BOOLEAN[],
+  ADD COLUMN "breakfastKitSelections" BOOLEAN[] NOT NULL DEFAULT ARRAY[]::BOOLEAN[];
+

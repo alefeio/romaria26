@@ -22,6 +22,7 @@ type Row = {
 
 const statusLabel: Record<string, string> = {
   DRAFT: "Rascunho",
+  SOON: "Em breve",
   OPEN: "Aberto",
   SOLD_OUT: "Esgotado",
   CLOSED: "Encerrado",
@@ -68,7 +69,9 @@ export default function AdminPacotesPage() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Pacotes (passeios)</h1>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">Cadastro público em /passeios quando status for Aberto e ativo.</p>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            No site público, aparecem: Em breve, Aberto e Esgotado (desde que ativo).
+          </p>
         </div>
         <Link href="/admin/pacotes/new">
           <Button>Novo pacote</Button>

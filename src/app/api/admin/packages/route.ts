@@ -21,6 +21,7 @@ export async function GET() {
     items: items.map((p) => ({
       ...p,
       price: p.price.toString(),
+      childPrice: p.childPrice.toString(),
       breakfastKitPrice: p.breakfastKitPrice.toString(),
     })),
   });
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
   }
 
   const price = new Prisma.Decimal(d.price);
+  const childPrice = new Prisma.Decimal(d.childPrice ?? "0");
   const breakfastKitPrice = new Prisma.Decimal(d.breakfastKitPrice ?? "0");
 
   try {
@@ -53,8 +55,10 @@ export async function POST(request: Request) {
         description: d.description?.trim() || null,
         shortDescription: d.shortDescription?.trim() || null,
         price,
+        childPrice,
         breakfastKitAvailable: d.breakfastKitAvailable ?? false,
         breakfastKitPrice,
+        kitsDeliveryInfo: d.kitsDeliveryInfo?.trim() || null,
         departureDate: departureDateFromYmd(d.departureDate),
         departureTime: d.departureTime.trim(),
         boardingLocation: d.boardingLocation.trim(),
@@ -70,6 +74,7 @@ export async function POST(request: Request) {
         item: {
           ...item,
           price: item.price.toString(),
+          childPrice: item.childPrice.toString(),
           breakfastKitPrice: item.breakfastKitPrice.toString(),
         },
       },

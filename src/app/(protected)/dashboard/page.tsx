@@ -63,11 +63,14 @@ export default async function DashboardPage() {
           <p className="mt-2 text-3xl font-semibold text-amber-700 dark:text-amber-300">{data.reservationsPending}</p>
           <p className="mt-1 text-xs text-[var(--text-muted)]">aguardando confirmação</p>
         </Link>
-        <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">Reservas (total)</p>
-          <p className="mt-2 text-3xl font-semibold text-[var(--text-primary)]">{data.reservationsTotal}</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">histórico completo</p>
-        </div>
+        <Link
+          href="/admin/clientes"
+          className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 shadow-sm transition hover:border-[var(--igh-primary)]"
+        >
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">Pagamentos de hoje</p>
+          <p className="mt-2 text-3xl font-semibold text-amber-700 dark:text-amber-300">{data.paymentsDueToday}</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">parcelas agendadas</p>
+        </Link>
       </div>
 
       <p className="mt-6 flex flex-wrap gap-x-4 gap-y-2 text-sm">

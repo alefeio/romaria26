@@ -12,7 +12,8 @@
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
     "postinstall": "prisma generate",
-    "seed": "prisma db seed"
+    "seed": "prisma db seed",
+    "reset:master": "tsx prisma/reset-master.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { Badge } from "@/components/ui/Badge";
@@ -158,6 +159,16 @@ export default function AdminReservasPage() {
                   <Badge tone={toneForStatus(r.status)}>{statusLabel[r.status] ?? r.status}</Badge>
                 </Td>
                 <Td className="text-right">
+                  <Link href={`/admin/reservas/${r.id}`} className="mr-2 inline-block">
+                    <Button type="button" variant="secondary" size="sm" className="mb-1">
+                      Detalhes
+                    </Button>
+                  </Link>
+                  <Link href={`/admin/reservas/${r.id}/pagamentos`} className="mr-2 inline-block">
+                    <Button type="button" variant="secondary" size="sm" className="mb-1">
+                      Pagamentos
+                    </Button>
+                  </Link>
                   {r.status !== "CONFIRMED" ? (
                     <Button type="button" variant="secondary" size="sm" className="mb-1 mr-1" onClick={() => void setStatus(r.id, "CONFIRMED")}>
                       Confirmar
