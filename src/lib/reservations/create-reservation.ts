@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import type { Reservation, ReservationStatus } from "@/generated/prisma/client";
+import { ensureReservationVouchersTx } from "@/lib/vouchers/reservation-vouchers";
 
 /**
  * Reservas que ocupam vagas: derivado das linhas em `Reservation`, sem campo
@@ -18,10 +19,15 @@ export type CreateReservationInput = {
   quantity: number;
   adultsCount: number;
   childrenCount: number;
+  adultNames: string[];
   adultShirtSizes: string[];
+  childrenNames: string[];
+  childrenAges: number[];
   childrenShirtNumbers: number[];
   breakfastSelections: boolean[];
   breakfastKitSelections: boolean[];
+  paymentPreferenceMethod?: string | null;
+  paymentPreferenceInstallments?: number | null;
   customerNameSnapshot: string;
   customerEmailSnapshot: string;
   customerPhoneSnapshot: string;
@@ -64,10 +70,15 @@ export async function createReservationInTransaction(
     quantity,
     adultsCount,
     childrenCount,
+    adultNames,
     adultShirtSizes,
+    childrenNames,
+    childrenAges,
     childrenShirtNumbers,
     breakfastSelections,
     breakfastKitSelections,
+    paymentPreferenceMethod,
+    paymentPreferenceInstallments,
     customerNameSnapshot,
     customerEmailSnapshot,
     customerPhoneSnapshot,
@@ -96,6 +107,14 @@ export async function createReservationInTransaction(
     throw new ReservationCreateError("INVALID_QUANTITY", "A soma de adultos e crianças deve ser igual ao total.");
   }
 
+  if (!Array.isArray(adultNames) || adultNames.length !== adultsCount) {
+    throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "Informe o nome completo para cada adulto.");
+  }
+  const adultFullNames = adultNames.map((s) => String(s ?? "").trim()).filter(Boolean);
+  if (adultFullNames.length !== adultsCount) {
+    throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "Informe o nome completo para cada adulto.");
+  }
+
   if (!Array.isArray(adultShirtSizes) || adultShirtSizes.length !== adultsCount) {
     throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "Informe o tamanho da camisa para cada adulto.");
   }
@@ -104,17 +123,33 @@ export async function createReservationInTransaction(
     throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "Informe o tamanho da camisa para cada adulto.");
   }
 
+  if (!Array.isArray(childrenNames) || childrenNames.length !== childrenCount) {
+    throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "Informe o nome completo para cada criança.");
+  }
+  const childFullNames = childrenNames.map((s) => String(s ?? "").trim()).filter(Boolean);
+  if (childFullNames.length !== childrenCount) {
+    throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "Informe o nome completo para cada criança.");
+  }
+
+  if (!Array.isArray(childrenAges) || childrenAges.length !== childrenCount) {
+    throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "Informe a idade (6 a 10) para cada criança.");
+  }
+  const childAgeNums = childrenAges.map((n) => (typeof n === "number" ? n : Number(n)));
+  if (childAgeNums.some((n) => !Number.isInteger(n) || n < 6 || n > 10)) {
+    throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "A idade das crianças deve ser entre 6 e 10 anos.");
+  }
+
   if (!Array.isArray(childrenShirtNumbers) || childrenShirtNumbers.length !== childrenCount) {
     throw new ReservationCreateError(
       "INVALID_CUSTOMER_DATA",
-      "Informe a idade/número da camisa para cada criança."
+      "Informe o número/tamanho da camisa para cada criança."
     );
   }
   const childNums = childrenShirtNumbers.map((n) => (typeof n === "number" ? n : Number(n)));
   if (childNums.some((n) => !Number.isInteger(n) || n <= 0 || n > 120)) {
     throw new ReservationCreateError(
       "INVALID_CUSTOMER_DATA",
-      "Idade/número da camisa das crianças deve ser um inteiro (ex.: 6, 8, 10, 12)."
+      "Número/tamanho da camisa das crianças deve ser um inteiro (ex.: 6, 8, 10, 12)."
     );
   }
 
@@ -144,10 +179,38 @@ export async function createReservationInTransaction(
     );
   }
 
+  const payMethod = String(paymentPreferenceMethod ?? "").trim().toUpperCase();
+  const allowed = new Set(["PIX", "DINHEIRO", "CARTAO", "TRANSFERENCIA", "OUTRO"]);
+  if (!payMethod || !allowed.has(payMethod)) {
+    throw new ReservationCreateError(
+      "INVALID_CUSTOMER_DATA",
+      "Informe o tipo de pagamento (Pix, Dinheiro, Cartão, Transferência ou Outro)."
+    );
+  }
+  const installmentsRaw =
+    paymentPreferenceInstallments === null || paymentPreferenceInstallments === undefined
+      ? null
+      : typeof paymentPreferenceInstallments === "number"
+        ? paymentPreferenceInstallments
+        : Number(paymentPreferenceInstallments);
+  const installments = installmentsRaw === null ? null : Math.trunc(installmentsRaw);
+  if (payMethod === "CARTAO") {
+    if (!installments || !Number.isInteger(installments) || installments < 1 || installments > 12) {
+      throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "Informe o número de parcelas (1 a 12) para cartão.");
+    }
+  }
+
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw(Prisma.sql`
       SELECT id FROM "Package" WHERE id = ${packageId} FOR UPDATE
     `);
+
+    // Regra: reservas pendentes seguram vaga por 24h; após isso, cancelam automaticamente.
+    const expiry = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await tx.reservation.updateMany({
+      where: { packageId, status: "PENDING", reservedAt: { lt: expiry } },
+      data: { status: "CANCELLED", confirmedAt: null },
+    });
 
     const pkg = await tx.package.findUnique({
       where: { id: packageId },
@@ -160,7 +223,7 @@ export async function createReservationInTransaction(
       );
     }
 
-    if (pkg.status !== "OPEN") {
+    if (pkg.status !== "OPEN" && pkg.status !== "SOLD_OUT") {
       throw new ReservationCreateError(
         "PACKAGE_UNAVAILABLE",
         "Este pacote não está aberto para reservas."
@@ -180,6 +243,10 @@ export async function createReservationInTransaction(
     });
 
     const used = agg._sum.quantity ?? 0;
+    if (used < pkg.capacity && pkg.status === "SOLD_OUT") {
+      await tx.package.update({ where: { id: pkg.id }, data: { status: "OPEN" } });
+      pkg.status = "OPEN";
+    }
     if (used + quantity > pkg.capacity) {
       throw new ReservationCreateError(
         "INSUFFICIENT_CAPACITY",
@@ -207,11 +274,16 @@ export async function createReservationInTransaction(
         quantity,
         adultsCount,
         childrenCount,
+        adultNames: adultFullNames,
         adultShirtSizes: adultSizes,
+        childrenNames: childFullNames,
+        childrenAges: childAgeNums,
         childrenShirtNumbers: childNums,
         breakfastSelections: breakfasts,
         breakfastKitSelections: kits,
         includesBreakfastKit: kits.some(Boolean),
+        paymentPreferenceMethod: payMethod,
+        paymentPreferenceInstallments: payMethod === "CARTAO" ? installments : null,
         unitPriceSnapshot: adultUnit,
         breakfastKitUnitPriceSnapshot: breakfastUnit,
         totalPrice,
@@ -228,8 +300,23 @@ export async function createReservationInTransaction(
       },
     });
 
+    // Regra: vouchers e numeração sequencial são definidos no ato da reserva.
+    await ensureReservationVouchersTx(tx, created.id);
+
     if (used + quantity >= pkg.capacity && pkg.status === "OPEN") {
       await tx.package.update({ where: { id: pkg.id }, data: { status: "SOLD_OUT" } });
+
+      // Regra: ao esgotar um lote, abrir automaticamente o próximo lote.
+      const m = pkg.slug.match(/^lote-(\d+)-(.*)$/i);
+      if (m) {
+        const curr = Number(m[1]);
+        const rest = m[2];
+        const nextSlug = `lote-${curr + 1}-${rest}`.toLowerCase();
+        const next = await tx.package.findUnique({ where: { slug: nextSlug } });
+        if (next && next.isActive && (next.status === "SOON" || next.status === "DRAFT")) {
+          await tx.package.update({ where: { id: next.id }, data: { status: "OPEN" } });
+        }
+      }
     }
 
     return created;
@@ -246,6 +333,13 @@ export async function getPackageRemainingCapacity(packageId: string): Promise<nu
   });
   if (!pkg || !pkg.isActive) return null;
   if (pkg.status !== "OPEN" && pkg.status !== "SOLD_OUT") return null;
+
+  // Expirar pendentes antigos (24h) para devolver vaga automaticamente.
+  const expiry = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  await prisma.reservation.updateMany({
+    where: { packageId, status: "PENDING", reservedAt: { lt: expiry } },
+    data: { status: "CANCELLED", confirmedAt: null },
+  });
 
   const agg = await prisma.reservation.aggregate({
     where: {

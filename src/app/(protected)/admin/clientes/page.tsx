@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Table, Td, Th } from "@/components/ui/Table";
 import type { ApiResponse } from "@/lib/api-types";
+import { displayCustomerEmail } from "@/lib/customer-placeholder-email";
 
 type CustomerRow = {
   id: string;
@@ -75,8 +76,17 @@ export default function AdminClientesPage() {
 
   const visible = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return items;
-    return items.filter((c) => (c.name ?? "").toLowerCase().includes(s) || (c.email ?? "").toLowerCase().includes(s));
+    const d = q.replace(/\D/g, "");
+    if (!s && !d) return items;
+    return items.filter((c) => {
+      if ((c.name ?? "").toLowerCase().includes(s)) return true;
+      if ((c.email ?? "").toLowerCase().includes(s)) return true;
+      if (d.length >= 3) {
+        if ((c.phone ?? "").includes(d)) return true;
+        if ((c.cpf ?? "").includes(d)) return true;
+      }
+      return false;
+    });
   }, [items, q]);
 
   return (
@@ -87,7 +97,17 @@ export default function AdminClientesPage() {
           <p className="mt-1 text-sm text-[var(--text-secondary)]">Cadastro e acompanhamento de etapa (cadastro, reservas, pagamentos).</p>
         </div>
         <div className="flex gap-2">
-          <Button type="button" onClick={() => { setTempPassword(null); setCreateOpen(true); }}>
+          <Button
+            type="button"
+            onClick={() => {
+              setTempPassword(null);
+              setNewName("");
+              setNewEmail("");
+              setNewPhone("");
+              setNewCpf("");
+              setCreateOpen(true);
+            }}
+          >
             Novo cliente
           </Button>
           <Button type="button" variant="secondary" onClick={() => void load()}>
@@ -97,7 +117,7 @@ export default function AdminClientesPage() {
       </div>
 
       <div className="mt-4 max-w-md">
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nome ou e-mail" />
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nome, e-mail, telefone ou CPF" />
       </div>
 
       {loading ? (
@@ -120,7 +140,7 @@ export default function AdminClientesPage() {
                 <tr key={c.id}>
                   <Td>
                     <div className="font-medium">{c.name}</div>
-                    <div className="text-xs text-[var(--text-muted)]">{c.email}</div>
+                    <div className="text-xs text-[var(--text-muted)]">{displayCustomerEmail(c.email)}</div>
                   </Td>
                   <Td>
                     <div className="text-xs text-[var(--text-muted)]">{c.phone ?? "-"}</div>
@@ -165,7 +185,7 @@ export default function AdminClientesPage() {
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({
                   name: newName,
-                  email: newEmail,
+                  email: newEmail.trim(),
                   phone: digitsOnly(newPhone),
                   cpf: digitsOnly(newCpf),
                 }),
@@ -188,8 +208,17 @@ export default function AdminClientesPage() {
             <Input value={newName} onChange={(e) => setNewName(e.target.value)} required className="mt-1" />
           </div>
           <div>
-            <label className="text-sm font-medium">E-mail</label>
-            <Input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} required type="email" className="mt-1" />
+            <label className="text-sm font-medium">E-mail (opcional)</label>
+            <Input
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              type="text"
+              inputMode="email"
+              autoComplete="off"
+              placeholder="deixe em branco se o cliente ainda não tiver e-mail"
+              className="mt-1"
+            />
+            <p className="mt-1 text-xs text-[var(--text-muted)]">Se vazio, será criado um e-mail interno (login poderá ser pelo e-mail quando o cliente informar depois).</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>

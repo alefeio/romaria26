@@ -16,6 +16,17 @@ type Row = {
   reservedAt: string;
   confirmedAt: string | null;
   package: { name: string; slug: string; departureDate: string; departureTime: string; boardingLocation: string };
+  vouchers: {
+    id: string;
+    code: string;
+    personType: string;
+    personIndex: number;
+    name: string;
+    age: number | null;
+    shirtSize: string;
+    hasBreakfastKit: boolean;
+    usedAt: string | null;
+  }[];
 };
 
 const statusLabel: Record<string, string> = {
@@ -82,32 +93,75 @@ export default function ClienteReservasPage() {
             </thead>
             <tbody>
               {items.map((r) => (
-                <tr key={r.id}>
-                  <Td>
-                    <Link href={`/passeios/${r.package.slug}`} className="font-medium text-[var(--igh-primary)] hover:underline">
-                      {r.package.name}
-                    </Link>
-                  </Td>
-                  <Td className="text-xs">
-                    {r.package.departureDate} {r.package.departureTime}
-                    <div className="text-[var(--text-muted)]">{r.package.boardingLocation}</div>
-                  </Td>
-                  <Td>
-                    {r.quantity}
-                    {r.includesBreakfastKit ? <span className="block text-xs text-[var(--text-muted)]">com kit café</span> : null}
-                  </Td>
-                  <Td>
-                    {Number.parseFloat(r.totalPrice).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                  </Td>
-                  <Td>
-                    <Badge tone={r.status === "CONFIRMED" ? "green" : r.status === "CANCELLED" ? "red" : "amber"}>
-                      {statusLabel[r.status] ?? r.status}
-                    </Badge>
-                  </Td>
-                  <Td className="whitespace-nowrap text-xs text-[var(--text-muted)]">
-                    {new Date(r.reservedAt).toLocaleString("pt-BR")}
-                  </Td>
-                </tr>
+                <div key={r.id} className="contents">
+                  <tr>
+                    <Td>
+                      <Link href={`/passeios/${r.package.slug}`} className="font-medium text-[var(--igh-primary)] hover:underline">
+                        {r.package.name}
+                      </Link>
+                    </Td>
+                    <Td className="text-xs">
+                      {r.package.departureDate} {r.package.departureTime}
+                      <div className="text-[var(--text-muted)]">{r.package.boardingLocation}</div>
+                    </Td>
+                    <Td>
+                      {r.quantity}
+                      {r.includesBreakfastKit ? <span className="block text-xs text-[var(--text-muted)]">com kit café</span> : null}
+                    </Td>
+                    <Td>
+                      {Number.parseFloat(r.totalPrice).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </Td>
+                    <Td>
+                      <Badge tone={r.status === "CONFIRMED" ? "green" : r.status === "CANCELLED" ? "red" : "amber"}>
+                        {statusLabel[r.status] ?? r.status}
+                      </Badge>
+                    </Td>
+                    <Td className="whitespace-nowrap text-xs text-[var(--text-muted)]">
+                      {new Date(r.reservedAt).toLocaleString("pt-BR")}
+                    </Td>
+                  </tr>
+                  {r.vouchers?.length ? (
+                    <tr>
+                      <Td colSpan={6} className="bg-[var(--igh-surface)]">
+                        <div className="py-2">
+                          <div className="text-xs font-medium text-[var(--text-muted)]">Vouchers</div>
+                          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                            {r.vouchers.map((v) => {
+                              const label =
+                                v.personType === "ADULT" ? `Adulto #${v.personIndex + 1}` : `Criança #${v.personIndex + 1}`;
+                              return (
+                                <div
+                                  key={v.id}
+                                  className="flex items-center justify-between gap-3 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="text-xs text-[var(--text-muted)]">{label}</div>
+                                    <div className="truncate text-sm font-medium text-[var(--text-primary)]">{v.name}</div>
+                                    <div className="text-xs text-[var(--text-muted)]">
+                                      Nº <span className="font-mono font-semibold">{v.code}</span> · Camisa {v.shirtSize} · Kit{" "}
+                                      {v.personType === "ADULT" ? (v.hasBreakfastKit ? "Sim" : "Não") : "—"}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <a
+                                      href={`/cliente/vouchers/${encodeURIComponent(v.code)}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-sm font-medium text-[var(--igh-primary)] hover:underline"
+                                    >
+                                      Abrir
+                                    </a>
+                                    <span className="text-xs text-[var(--text-muted)]">{v.usedAt ? "Usado" : "Não usado"}</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </Td>
+                    </tr>
+                  ) : null}
+                </div>
               ))}
             </tbody>
           </Table>

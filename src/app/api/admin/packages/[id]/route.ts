@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminApi } from "@/lib/api-admin-guard";
 import { jsonErr, jsonOk } from "@/lib/http";
 import { adminPackageUpdateSchema } from "@/lib/validators/packages";
+import { getPackageRemainingCapacity } from "@/lib/reservations/create-reservation";
 
 function departureDateFromYmd(ymd: string): Date {
   const [y, m, d] = ymd.split("-").map((x) => Number(x));
@@ -23,12 +24,15 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
   const item = await prisma.package.findUnique({ where: { id } });
   if (!item) return jsonErr("NOT_FOUND", "Pacote não encontrado.", 404);
 
+  const remainingPlaces = await getPackageRemainingCapacity(id);
+
   return jsonOk({
     item: {
       ...item,
       price: item.price.toString(),
       childPrice: item.childPrice.toString(),
       breakfastKitPrice: item.breakfastKitPrice.toString(),
+      remainingPlaces,
     },
   });
 }

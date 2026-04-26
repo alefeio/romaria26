@@ -5,6 +5,7 @@ import { jsonErr, jsonOk } from "@/lib/http";
 import { adminCreateReservationPaymentSchema } from "@/lib/validators/payments";
 import { recalcReservationPaymentStatus } from "@/lib/payments/reservation-payments";
 import { createAuditLog } from "@/lib/audit";
+import { sendReservationVouchersIfPaid } from "@/lib/vouchers/reservation-vouchers";
 
 function isUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
@@ -22,6 +23,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
     include: {
       payments: { orderBy: [{ paidAt: "desc" }] },
       installments: { orderBy: [{ dueDate: "asc" }] },
+      vouchers: { orderBy: [{ personType: "asc" }, { personIndex: "asc" }] },
       package: { select: { id: true, name: true, slug: true, departureDate: true } },
       user: { select: { id: true, name: true, email: true } },
     },
@@ -62,6 +64,18 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       createdAt: i.createdAt.toISOString(),
       updatedAt: i.updatedAt.toISOString(),
     })),
+    vouchers: reservation.vouchers.map((v) => ({
+      id: v.id,
+      personType: v.personType,
+      personIndex: v.personIndex,
+      code: v.code,
+      name: v.name,
+      age: v.age ?? null,
+      shirtSize: v.shirtSize,
+      hasBreakfastKit: v.hasBreakfastKit,
+      usedAt: v.usedAt?.toISOString() ?? null,
+      createdAt: v.createdAt.toISOString(),
+    })),
   });
 }
 
@@ -99,7 +113,10 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    const reservation = await tx.reservation.findUnique({ where: { id }, select: { id: true, totalDue: true } });
+    const reservation = await tx.reservation.findUnique({
+      where: { id },
+      select: { id: true, totalDue: true, paymentStatus: true },
+    });
     if (!reservation) return null;
 
     const payment = await tx.reservationPayment.create({
@@ -161,6 +178,11 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   });
 
   if (!result) return jsonErr("NOT_FOUND", "Reserva não encontrada.", 404);
+
+  // Se este pagamento quitou 100%, gera vouchers e envia ao cliente (idempotente).
+  if (result.updated?.paymentStatus === "PAID") {
+    await sendReservationVouchersIfPaid(id, auth.id).catch(() => null);
+  }
 
   return jsonOk(
     {

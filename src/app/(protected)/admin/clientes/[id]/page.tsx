@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useToast } from "@/components/feedback/ToastProvider";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
 import { Table, Td, Th } from "@/components/ui/Table";
 import type { ApiResponse } from "@/lib/api-types";
+import { displayCustomerEmail, isCustomerPlaceholderEmail } from "@/lib/customer-placeholder-email";
 
 type ReservationRow = {
   id: string;
@@ -42,6 +45,7 @@ type CustomerDetail = {
 
 export default function AdminClienteDetailPage() {
   const toast = useToast();
+  const router = useRouter();
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "";
 
@@ -49,6 +53,26 @@ export default function AdminClienteDetailPage() {
   const [item, setItem] = useState<CustomerDetail | null>(null);
   const [installmentsDueToday, setInstallmentsDueToday] = useState<number>(0);
   const [paymentsToday, setPaymentsToday] = useState<number>(0);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editCpf, setEditCpf] = useState("");
+
+  function digitsOnly(s: string): string {
+    return (s ?? "").replace(/\D/g, "");
+  }
+
+  useEffect(() => {
+    if (!item) return;
+    setEditName(item.name);
+    setEditEmail(item.email);
+    setEditPhone(item.phone ?? "");
+    setEditCpf(item.cpf ?? "");
+  }, [item]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -110,7 +134,10 @@ export default function AdminClienteDetailPage() {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h1 className="text-2xl font-semibold text-[var(--text-primary)]">{item.name}</h1>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">{item.email}</p>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">{displayCustomerEmail(item.email)}</p>
+              {isCustomerPlaceholderEmail(item.email) ? (
+                <p className="mt-1 text-xs text-[var(--text-muted)]">E-mail ainda não informado (cadastro interno).</p>
+              ) : null}
               <p className="mt-1 text-sm text-[var(--text-secondary)]">{item.phone ?? "-"}</p>
               {item.cpf ? <p className="mt-1 text-sm text-[var(--text-secondary)]">CPF: {item.cpf}</p> : null}
             </div>
@@ -138,9 +165,46 @@ export default function AdminClienteDetailPage() {
                   </div>
                 </div>
               ) : null}
-              <Button type="button" variant="secondary" onClick={() => void load()}>
-                Atualizar
-              </Button>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={() => void load()}>
+                  Atualizar
+                </Button>
+                <Link
+                  href={`/admin/clientes/${id}/nova-reserva`}
+                  className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                >
+                  Nova reserva
+                </Link>
+                <Button type="button" variant="secondary" onClick={() => setEditOpen(true)}>
+                  Editar dados
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  disabled={deleting}
+                  onClick={async () => {
+                    if (!id) return;
+                    if (!window.confirm("Excluir este cliente definitivamente? Só é permitido se não houver reservas.")) {
+                      return;
+                    }
+                    setDeleting(true);
+                    try {
+                      const res = await fetch(`/api/admin/customers/${id}`, { method: "DELETE" });
+                      const json = (await res.json()) as ApiResponse<unknown>;
+                      if (!res.ok || !json.ok) {
+                        toast.push("error", !json.ok ? (json as { ok: false; error: { message: string } }).error.message : "Falha ao excluir.");
+                        return;
+                      }
+                      toast.push("success", "Cliente excluído.");
+                      router.push("/admin/clientes");
+                    } finally {
+                      setDeleting(false);
+                    }
+                  }}
+                >
+                  {deleting ? "Excluindo…" : "Excluir cliente"}
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -202,6 +266,101 @@ export default function AdminClienteDetailPage() {
               </tbody>
             </Table>
           </div>
+
+          <Modal
+            open={editOpen}
+            onClose={() => {
+              setEditOpen(false);
+              if (item) {
+                setEditName(item.name);
+                setEditEmail(item.email);
+                setEditPhone(item.phone ?? "");
+                setEditCpf(item.cpf ?? "");
+              }
+            }}
+            title="Editar cliente"
+            size="small"
+          >
+            <form
+              className="space-y-3"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!id || saving) return;
+                setSaving(true);
+                try {
+                  const res = await fetch(`/api/admin/customers/${id}`, {
+                    method: "PATCH",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({
+                      name: editName.trim(),
+                      email: editEmail.trim(),
+                      phone: digitsOnly(editPhone),
+                      cpf: digitsOnly(editCpf),
+                    }),
+                  });
+                  const json = (await res.json()) as ApiResponse<unknown>;
+                  if (!res.ok || !json.ok) {
+                    toast.push("error", !json.ok ? (json as { ok: false; error: { message: string } }).error.message : "Falha ao salvar.");
+                    return;
+                  }
+                  toast.push("success", "Dados atualizados.");
+                  setEditOpen(false);
+                  await load();
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              <div>
+                <label className="text-sm font-medium">Nome</label>
+                <Input value={editName} onChange={(e) => setEditName(e.target.value)} required className="mt-1" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">E-mail</label>
+                <Input
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  type="text"
+                  inputMode="email"
+                  autoComplete="off"
+                  className="mt-1"
+                />
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Deixe o e-mail interno (termina em @sem-email.interno) até o cliente informar um e-mail de contato, ou substitua por um e-mail válido.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-sm font-medium">WhatsApp (DDD + celular)</label>
+                  <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="mt-1" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">CPF (opcional)</label>
+                  <Input value={editCpf} onChange={(e) => setEditCpf(e.target.value)} className="mt-1" />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setEditOpen(false);
+                    if (item) {
+                      setEditName(item.name);
+                      setEditEmail(item.email);
+                      setEditPhone(item.phone ?? "");
+                      setEditCpf(item.cpf ?? "");
+                    }
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={saving}>
+                  {saving ? "Salvando…" : "Salvar"}
+                </Button>
+              </div>
+            </form>
+          </Modal>
         </>
       )}
     </div>

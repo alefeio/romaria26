@@ -29,6 +29,20 @@ export async function GET() {
           boardingLocation: true,
         },
       },
+      vouchers: {
+        orderBy: [{ personType: "asc" }, { personIndex: "asc" }],
+        select: {
+          id: true,
+          code: true,
+          personType: true,
+          personIndex: true,
+          name: true,
+          age: true,
+          shirtSize: true,
+          hasBreakfastKit: true,
+          usedAt: true,
+        },
+      },
     },
   });
 
@@ -51,6 +65,17 @@ export async function GET() {
       status: r.status,
       notes: r.notes,
       kitsDeliveryInfoSnapshot: r.kitsDeliveryInfoSnapshot ?? null,
+      vouchers: r.vouchers.map((v) => ({
+        id: v.id,
+        code: v.code,
+        personType: v.personType,
+        personIndex: v.personIndex,
+        name: v.name,
+        age: v.age ?? null,
+        shirtSize: v.shirtSize,
+        hasBreakfastKit: v.hasBreakfastKit,
+        usedAt: v.usedAt?.toISOString() ?? null,
+      })),
       reservedAt: r.reservedAt.toISOString(),
       confirmedAt: r.confirmedAt?.toISOString() ?? null,
       package: {
@@ -94,10 +119,17 @@ export async function POST(request: Request) {
   const quantity = typeof o.quantity === "number" ? o.quantity : Number.NaN;
   const adultsCount = typeof o.adultsCount === "number" ? o.adultsCount : Number.NaN;
   const childrenCount = typeof o.childrenCount === "number" ? o.childrenCount : Number.NaN;
+  const adultNames = Array.isArray(o.adultNames) ? o.adultNames : [];
   const adultShirtSizes = Array.isArray(o.adultShirtSizes) ? o.adultShirtSizes : [];
+  const childrenNames = Array.isArray(o.childrenNames) ? o.childrenNames : [];
+  const childrenAges = Array.isArray(o.childrenAges) ? o.childrenAges : [];
   const childrenShirtNumbers = Array.isArray(o.childrenShirtNumbers) ? o.childrenShirtNumbers : [];
   const breakfastSelections = Array.isArray(o.breakfastSelections) ? o.breakfastSelections : [];
   const breakfastKitSelections = Array.isArray(o.breakfastKitSelections) ? o.breakfastKitSelections : [];
+  const paymentPreferenceMethod =
+    typeof o.paymentPreferenceMethod === "string" ? o.paymentPreferenceMethod : null;
+  const paymentPreferenceInstallments =
+    typeof o.paymentPreferenceInstallments === "number" ? o.paymentPreferenceInstallments : null;
   const customerNameSnapshot =
     typeof o.customerNameSnapshot === "string" ? o.customerNameSnapshot : "";
   const customerEmailSnapshot =
@@ -117,10 +149,15 @@ export async function POST(request: Request) {
       quantity,
       adultsCount,
       childrenCount,
+      adultNames: adultNames.map((s) => String(s ?? "")),
       adultShirtSizes: adultShirtSizes.map((s) => String(s ?? "")),
+      childrenNames: childrenNames.map((s) => String(s ?? "")),
+      childrenAges: childrenAges.map((n) => (typeof n === "number" ? n : Number(n))),
       childrenShirtNumbers: childrenShirtNumbers.map((n) => (typeof n === "number" ? n : Number(n))),
       breakfastSelections: breakfastSelections.map((v) => Boolean(v)),
       breakfastKitSelections: breakfastKitSelections.map((v) => Boolean(v)),
+      paymentPreferenceMethod,
+      paymentPreferenceInstallments,
       customerNameSnapshot,
       customerEmailSnapshot,
       customerPhoneSnapshot,
@@ -151,7 +188,6 @@ export async function POST(request: Request) {
       ? reservation.childrenShirtNumbers.map((n, i) => `C${i + 1}:${n}`).join(", ")
       : "-";
     const kitCount = reservation.breakfastKitSelections.filter(Boolean).length;
-    const breakfastCount = reservation.breakfastSelections.filter(Boolean).length;
 
     const kitInfo = reservation.kitsDeliveryInfoSnapshot?.trim();
     const siteName = settings?.siteName ?? "Romaria Fluvial";
@@ -161,9 +197,12 @@ export async function POST(request: Request) {
       pkgLine,
       `Embarque: ${pkg?.boardingLocation ?? "-"}`,
       `Adultos: ${reservation.adultsCount} | Crianças: ${reservation.childrenCount} | Total: ${reservation.quantity}`,
+      `Pagamento: ${reservation.paymentPreferenceMethod ?? "-"}` +
+        (reservation.paymentPreferenceMethod === "CARTAO" && reservation.paymentPreferenceInstallments
+          ? ` (${reservation.paymentPreferenceInstallments}x)`
+          : ""),
       `Camisas adultos: ${adultSizesLine}`,
-      `Camisas crianças (idade/número): ${childNumsLine}`,
-      `Café da manhã (marcados): ${breakfastCount}/${reservation.quantity}`,
+      `Camisas crianças (número/tamanho): ${childNumsLine}`,
       `Kit café (adultos marcados): ${kitCount}/${reservation.adultsCount}`,
       kitInfo ? `Entrega dos kits: ${kitInfo}` : null,
       `Cliente: ${reservation.customerNameSnapshot}`,

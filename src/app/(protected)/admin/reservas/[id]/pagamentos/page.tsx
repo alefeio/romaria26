@@ -32,6 +32,19 @@ type Installment = {
   receiptUrl: string | null;
 };
 
+type Voucher = {
+  id: string;
+  personType: string;
+  personIndex: number;
+  code: string;
+  name: string;
+  age: number | null;
+  shirtSize: string;
+  hasBreakfastKit: boolean;
+  usedAt: string | null;
+  createdAt: string;
+};
+
 type ReservationHeader = {
   id: string;
   user: { id: string; name: string; email: string };
@@ -54,11 +67,13 @@ export default function AdminReservaPagamentosPage() {
   const [header, setHeader] = useState<ReservationHeader | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [installments, setInstallments] = useState<Installment[]>([]);
+  const [vouchers, setVouchers] = useState<Voucher[]>([]);
 
   const [payOpen, setPayOpen] = useState(false);
   const [payMode, setPayMode] = useState<"FREE" | "INSTALLMENT">("FREE");
   const [payInstallmentId, setPayInstallmentId] = useState("");
   const [payAmount, setPayAmount] = useState("");
+  const [payFillPending, setPayFillPending] = useState(false);
   const [payMethod, setPayMethod] = useState<"PIX" | "CASH" | "CARD" | "TRANSFER" | "OTHER">("PIX");
   const [payReceiptUrl, setPayReceiptUrl] = useState("");
   const [payNote, setPayNote] = useState("");
@@ -68,6 +83,7 @@ export default function AdminReservaPagamentosPage() {
   const [instOpen, setInstOpen] = useState(false);
   const [instDueDate, setInstDueDate] = useState("");
   const [instAmount, setInstAmount] = useState("");
+  const [instFillPending, setInstFillPending] = useState(false);
   const [instMethod, setInstMethod] = useState<"PIX" | "CASH" | "CARD" | "TRANSFER" | "OTHER">("PIX");
   const [savingInst, setSavingInst] = useState(false);
 
@@ -80,6 +96,7 @@ export default function AdminReservaPagamentosPage() {
         reservation: ReservationHeader;
         payments: Payment[];
         installments: Installment[];
+        vouchers: Voucher[];
       }>;
       if (!res.ok || !json.ok) {
         toast.push("error", !json.ok ? json.error.message : "Falha ao carregar pagamentos.");
@@ -88,6 +105,7 @@ export default function AdminReservaPagamentosPage() {
       setHeader(json.data.reservation);
       setPayments(json.data.payments);
       setInstallments(json.data.installments);
+      setVouchers(json.data.vouchers ?? []);
     } finally {
       setLoading(false);
     }
@@ -103,16 +121,21 @@ export default function AdminReservaPagamentosPage() {
     return Math.max(0, due - paid);
   }, [header?.totalDue, header?.totalPaid]);
 
+  const remainingAmountText = useMemo(() => remaining.toFixed(2), [remaining]);
+  const isFullyPaid = remaining <= 0;
+
   const scheduledInstallments = useMemo(
     () => installments.filter((i) => i.status === "SCHEDULED"),
     [installments]
   );
 
   function openPayModal(opts?: { mode?: "FREE" | "INSTALLMENT"; installmentId?: string }) {
+    if (isFullyPaid) return;
     const mode = opts?.mode ?? "FREE";
     setPayMode(mode);
     setPayInstallmentId(opts?.installmentId ?? "");
     setPayAmount("");
+    setPayFillPending(false);
     setPayReceiptUrl("");
     setPayNote("");
     setPayMethod("PIX");
@@ -139,6 +162,10 @@ export default function AdminReservaPagamentosPage() {
   async function createPayment(e: React.FormEvent) {
     e.preventDefault();
     if (!id || savingPay) return;
+    if (isFullyPaid) {
+      toast.push("error", "Esta reserva já está 100% paga.");
+      return;
+    }
     if (payMode === "INSTALLMENT") {
       if (!payInstallmentId) {
         toast.push("error", "Selecione a parcela agendada.");
@@ -222,6 +249,10 @@ export default function AdminReservaPagamentosPage() {
   async function createInstallment(e: React.FormEvent) {
     e.preventDefault();
     if (!id || savingInst) return;
+    if (isFullyPaid) {
+      toast.push("error", "Esta reserva já está 100% paga.");
+      return;
+    }
     const dueDate = normalizeYmd(instDueDate);
     if (!dueDate) {
       toast.push("error", "Informe a data.");
@@ -302,10 +333,21 @@ export default function AdminReservaPagamentosPage() {
                   </div>
                 </div>
                 <div className="mt-3 flex justify-end gap-2">
-                  <Button type="button" onClick={() => openPayModal({ mode: "FREE" })}>
+                  <Button
+                    type="button"
+                    disabled={isFullyPaid}
+                    onClick={() => openPayModal({ mode: "FREE" })}
+                    title={isFullyPaid ? "Esta reserva já está 100% paga." : undefined}
+                  >
                     Registrar pagamento
                   </Button>
-                  <Button type="button" variant="secondary" onClick={() => setInstOpen(true)}>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={isFullyPaid}
+                    onClick={() => setInstOpen(true)}
+                    title={isFullyPaid ? "Esta reserva já está 100% paga." : undefined}
+                  >
                     Cadastrar parcela
                   </Button>
                 </div>
@@ -474,6 +516,67 @@ export default function AdminReservaPagamentosPage() {
             </Table>
           </div>
 
+          <div className="mt-8">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Vouchers</h2>
+              <div className="text-xs text-[var(--text-muted)]">
+                {vouchers.length}/{header.quantity} gerado(s)
+              </div>
+            </div>
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Código</Th>
+                  <Th>Nome</Th>
+                  <Th>Tipo</Th>
+                  <Th>Camisa</Th>
+                  <Th>Kit café</Th>
+                  <Th className="text-right">Ação</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {vouchers.map((v) => (
+                  <tr key={v.id}>
+                    <Td className="font-mono text-xs">{v.code}</Td>
+                    <Td>
+                      <div className="font-medium">{v.name}</div>
+                      {v.age !== null ? (
+                        <div className="text-xs text-[var(--text-muted)]">Idade: {v.age}</div>
+                      ) : null}
+                    </Td>
+                    <Td className="text-xs text-[var(--text-muted)]">
+                      {v.personType === "ADULT" ? `Adulto #${v.personIndex + 1}` : `Criança #${v.personIndex + 1}`}
+                    </Td>
+                    <Td className="text-sm">{v.shirtSize}</Td>
+                    <Td className="text-sm">{v.personType === "ADULT" ? (v.hasBreakfastKit ? "Sim" : "Não") : "—"}</Td>
+                    <Td className="text-right">
+                      <a
+                        className="text-sm font-medium text-[var(--igh-primary)] hover:underline"
+                        href={`/voucher/${encodeURIComponent(v.code)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Abrir
+                      </a>
+                    </Td>
+                  </tr>
+                ))}
+                {vouchers.length === 0 ? (
+                  <tr>
+                    <Td colSpan={6} className="py-10 text-center text-[var(--text-muted)]">
+                      Nenhum voucher gerado ainda.
+                    </Td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </Table>
+            {header.paymentStatus !== "PAID" ? (
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                Os vouchers são enviados por e-mail após a reserva ficar 100% paga.
+              </p>
+            ) : null}
+          </div>
+
           <Modal
             open={payOpen}
             title="Registrar pagamento"
@@ -532,7 +635,27 @@ export default function AdminReservaPagamentosPage() {
 
               <div>
                 <label className="text-sm font-medium">Valor (R$)</label>
-                <Input value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder="Ex.: 150" />
+                <Input
+                  value={payAmount}
+                  onChange={(e) => {
+                    setPayAmount(e.target.value);
+                    if (payFillPending) setPayFillPending(false);
+                  }}
+                  placeholder="Ex.: 150"
+                />
+                <label className="mt-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                  <input
+                    type="checkbox"
+                    checked={payFillPending}
+                    disabled={remaining <= 0}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setPayFillPending(checked);
+                      if (checked) setPayAmount(remainingAmountText);
+                    }}
+                  />
+                  Preencher valor pendente automaticamente
+                </label>
               </div>
               <div>
                 <label className="text-sm font-medium">Método</label>
@@ -580,7 +703,27 @@ export default function AdminReservaPagamentosPage() {
               </div>
               <div>
                 <label className="text-sm font-medium">Valor (R$)</label>
-                <Input value={instAmount} onChange={(e) => setInstAmount(e.target.value)} placeholder="Ex.: 50" />
+                <Input
+                  value={instAmount}
+                  onChange={(e) => {
+                    setInstAmount(e.target.value);
+                    if (instFillPending) setInstFillPending(false);
+                  }}
+                  placeholder="Ex.: 50"
+                />
+                <label className="mt-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                  <input
+                    type="checkbox"
+                    checked={instFillPending}
+                    disabled={remaining <= 0}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setInstFillPending(checked);
+                      if (checked) setInstAmount(remainingAmountText);
+                    }}
+                  />
+                  Preencher valor pendente automaticamente
+                </label>
               </div>
               <div>
                 <label className="text-sm font-medium">Método (previsto)</label>

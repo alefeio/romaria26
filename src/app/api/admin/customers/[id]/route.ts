@@ -92,6 +92,26 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
   }
   const d = parsed.data;
 
+  const hasChange =
+    d.name !== undefined || d.email !== undefined || d.phone !== undefined || d.cpf !== undefined;
+  if (!hasChange) {
+    return jsonErr("VALIDATION_ERROR", "Nenhum campo para atualizar.", 400);
+  }
+
+  if (d.email !== undefined) {
+    const em = d.email.trim().toLowerCase();
+    const taken = await prisma.user.findFirst({
+      where: { email: em, NOT: { id } },
+      select: { id: true, role: true },
+    });
+    if (taken) {
+      if (taken.role !== "CUSTOMER") {
+        return jsonErr("EMAIL_IN_USE", "Este e-mail já está em uso por outro perfil.", 409);
+      }
+      return jsonErr("EMAIL_IN_USE", "Este e-mail já pertence a outro cliente.", 409);
+    }
+  }
+
   const updated = await prisma.user.update({
     where: { id },
     data: {
@@ -112,5 +132,46 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
   });
 
   return jsonOk({ item: { ...updated, createdAt: updated.createdAt.toISOString() } });
+}
+
+export async function DELETE(_request: Request, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdminApi();
+  if (auth instanceof Response) return auth;
+
+  const { id } = await ctx.params;
+  if (!isUuid(id)) return jsonErr("INVALID_ID", "ID inválido.", 400);
+
+  const existing = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, role: true, name: true, email: true },
+  });
+  if (!existing || existing.role !== "CUSTOMER") return jsonErr("NOT_FOUND", "Cliente não encontrado.", 404);
+
+  const [resCount, ticketCount] = await Promise.all([
+    prisma.reservation.count({ where: { userId: id } }),
+    prisma.supportTicket.count({ where: { userId: id } }),
+  ]);
+  if (resCount > 0) {
+    return jsonErr(
+      "HAS_RESERVATIONS",
+      "Não é possível excluir um cliente com reservas. Remova ou transfira as reservas antes.",
+      400
+    );
+  }
+  if (ticketCount > 0) {
+    return jsonErr("HAS_SUPPORT_TICKETS", "Não é possível excluir um cliente com chamados de suporte.", 400);
+  }
+
+  await prisma.user.delete({ where: { id } });
+
+  await createAuditLog({
+    entityType: "User",
+    entityId: id,
+    action: "CUSTOMER_DELETED",
+    diff: { deleted: { name: existing.name, email: existing.email } },
+    performedByUserId: auth.id,
+  });
+
+  return jsonOk({ ok: true });
 }
 

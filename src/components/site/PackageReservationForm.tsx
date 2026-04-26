@@ -16,6 +16,9 @@ type Props = {
   defaultName?: string;
   defaultEmail?: string;
   defaultPhone?: string;
+  /** Cria a reserva via API do painel em nome deste usuário (cliente). */
+  adminForUserId?: string;
+  onAdminReservationCreated?: (reservationId: string) => void;
 };
 
 function formatBrl(value: string): string {
@@ -36,7 +39,10 @@ export function PackageReservationForm({
   defaultName = "",
   defaultEmail = "",
   defaultPhone = "",
+  adminForUserId,
+  onAdminReservationCreated,
 }: Props) {
+  const isAdminForCustomer = Boolean(adminForUserId);
   const [adultsCount, setAdultsCount] = useState(1);
   const [childrenCount, setChildrenCount] = useState(0);
   const [customerNameSnapshot, setCustomerNameSnapshot] = useState(defaultName);
@@ -56,32 +62,48 @@ export function PackageReservationForm({
     return `(${dd}) ${part1}${part2 ? "-" + part2 : ""}`;
   }
   const [notes, setNotes] = useState("");
+  const [paymentPreferenceMethod, setPaymentPreferenceMethod] = useState<
+    "PIX" | "DINHEIRO" | "CARTAO" | "TRANSFERENCIA" | "OUTRO"
+  >("PIX");
+  const [paymentPreferenceInstallments, setPaymentPreferenceInstallments] = useState<number>(1);
+  const [adultNames, setAdultNames] = useState<string[]>([defaultName || ""]);
   const [adultShirtSizes, setAdultShirtSizes] = useState<string[]>(["M"]);
+  const [childrenNames, setChildrenNames] = useState<string[]>([]);
+  const [childrenAges, setChildrenAges] = useState<number[]>([]);
   const [childrenShirtNumbers, setChildrenShirtNumbers] = useState<number[]>([]);
-  const [breakfastSelections, setBreakfastSelections] = useState<boolean[]>([false]);
   const [breakfastKitSelections, setBreakfastKitSelections] = useState<boolean[]>([false]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   const maxQty = remainingPlaces !== null && remainingPlaces > 0 ? remainingPlaces : 1;
-  const canBook = loggedIn && remainingPlaces !== null && remainingPlaces > 0;
+  const canBook = (isAdminForCustomer || loggedIn) && remainingPlaces !== null && remainingPlaces > 0;
   const quantity = Math.max(0, adultsCount) + Math.max(0, childrenCount);
 
   const shirtCount = Math.min(maxQty, Math.max(1, quantity));
   useEffect(() => {
+    setAdultNames((prev) => {
+      const next = prev.slice(0, adultsCount);
+      while (next.length < adultsCount) next.push("");
+      return next;
+    });
     setAdultShirtSizes((prev) => {
       const next = prev.slice(0, adultsCount);
       while (next.length < adultsCount) next.push(prev[prev.length - 1] ?? "M");
       return next;
     });
-    setChildrenShirtNumbers((prev) => {
+    setChildrenNames((prev) => {
+      const next = prev.slice(0, childrenCount);
+      while (next.length < childrenCount) next.push("");
+      return next;
+    });
+    setChildrenAges((prev) => {
       const next = prev.slice(0, childrenCount);
       while (next.length < childrenCount) next.push(6);
       return next;
     });
-    setBreakfastSelections((prev) => {
-      const next = prev.slice(0, shirtCount);
-      while (next.length < shirtCount) next.push(false);
+    setChildrenShirtNumbers((prev) => {
+      const next = prev.slice(0, childrenCount);
+      while (next.length < childrenCount) next.push(6);
       return next;
     });
     setBreakfastKitSelections((prev) => {
@@ -120,10 +142,27 @@ export function PackageReservationForm({
       setMessage({ type: "err", text: "Informe pelo menos 1 pessoa (adulto ou criança)." });
       return;
     }
+    const invalidAdultName = adultNames.some((n) => !String(n ?? "").trim());
+    if (invalidAdultName) {
+      setMessage({ type: "err", text: "Informe o nome completo para cada adulto." });
+      return;
+    }
+    if (childrenCount > 0) {
+      const invalidChildName = childrenNames.some((n) => !String(n ?? "").trim());
+      if (invalidChildName) {
+        setMessage({ type: "err", text: "Informe o nome completo para cada criança." });
+        return;
+      }
+      const invalidAge = childrenAges.some((n) => !Number.isInteger(n) || n < 6 || n > 10);
+      if (invalidAge) {
+        setMessage({ type: "err", text: "A idade das crianças deve ser entre 6 e 10 anos." });
+        return;
+      }
+    }
     if (childrenCount > 0) {
       const invalidChild = childrenShirtNumbers.some((n) => !Number.isInteger(n) || n <= 0);
       if (invalidChild) {
-        setMessage({ type: "err", text: "Informe a idade/número da camisa para cada criança (ex.: 6, 8, 10, 12)." });
+        setMessage({ type: "err", text: "Informe o número/tamanho da camisa para cada criança (ex.: 6, 8, 10, 12)." });
         return;
       }
     }
@@ -131,33 +170,57 @@ export function PackageReservationForm({
       setMessage({ type: "err", text: "Informe um celular com DDD (11 dígitos) no WhatsApp." });
       return;
     }
+    if (paymentPreferenceMethod === "CARTAO") {
+      if (!Number.isInteger(paymentPreferenceInstallments) || paymentPreferenceInstallments < 1 || paymentPreferenceInstallments > 12) {
+        setMessage({ type: "err", text: "Informe o número de parcelas (1 a 12) para cartão." });
+        return;
+      }
+    }
     setLoading(true);
     try {
-      const res = await fetch("/api/me/reservations", {
+      const basePayload = {
+        packageId,
+        adultsCount,
+        childrenCount,
+        quantity: shirtCount,
+        paymentPreferenceMethod,
+        paymentPreferenceInstallments: paymentPreferenceMethod === "CARTAO" ? paymentPreferenceInstallments : null,
+        adultNames,
+        adultShirtSizes,
+        childrenNames,
+        childrenAges,
+        childrenShirtNumbers,
+        // legado: manter no backend como falso para todos
+        breakfastSelections: Array.from({ length: shirtCount }, () => false),
+        breakfastKitSelections: breakfastKitAvailable ? breakfastKitSelections : adultShirtSizes.map(() => false),
+        customerNameSnapshot: customerNameSnapshot.trim(),
+        customerEmailSnapshot: customerEmailSnapshot.trim(),
+        customerPhoneSnapshot: customerPhoneSnapshot.trim(),
+        notes: notes.trim() || undefined,
+        initialStatus: "PENDING" as const,
+      };
+      const res = await fetch(isAdminForCustomer ? "/api/admin/reservations" : "/api/me/reservations", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          packageId,
-          adultsCount,
-          childrenCount,
-          quantity: shirtCount,
-          adultShirtSizes,
-          childrenShirtNumbers,
-          breakfastSelections,
-          breakfastKitSelections: breakfastKitAvailable ? breakfastKitSelections : adultShirtSizes.map(() => false),
-          customerNameSnapshot: customerNameSnapshot.trim(),
-          customerEmailSnapshot: customerEmailSnapshot.trim(),
-          customerPhoneSnapshot: customerPhoneSnapshot.trim(),
-          notes: notes.trim() || undefined,
-          initialStatus: "PENDING",
-        }),
+        body: JSON.stringify(
+          isAdminForCustomer ? { userId: adminForUserId, ...basePayload } : basePayload
+        ),
       });
       const json = (await res.json()) as
         | { ok: true; data: { reservation: { id: string }; whatsappUrl?: string } }
         | { ok: false; error: { message: string } };
       if (!res.ok || !json.ok) {
         setMessage({ type: "err", text: !json.ok ? json.error.message : "Não foi possível reservar." });
+        return;
+      }
+      if (isAdminForCustomer) {
+        setMessage({
+          type: "ok",
+          text: "Reserva registrada. Você pode gerenciar pagamentos na tela desta reserva.",
+        });
+        onAdminReservationCreated?.(json.data.reservation.id);
+        setNotes("");
         return;
       }
       setMessage({
@@ -173,7 +236,7 @@ export function PackageReservationForm({
     }
   }
 
-  if (!loggedIn) {
+  if (!loggedIn && !isAdminForCustomer) {
     return (
       <div className="rounded-xl border border-[var(--igh-border)] bg-[var(--card-bg)] p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-[var(--igh-secondary)]">Reservar</h2>
@@ -186,7 +249,7 @@ export function PackageReservationForm({
         <Button
           as="link"
           href={`/cadastro?from=/passeios/${encodeURIComponent(slug)}`}
-          variant="outline"
+          variant="secondary"
           className="mt-2"
         >
           Criar conta
@@ -232,6 +295,46 @@ export function PackageReservationForm({
       ) : null}
 
       <form onSubmit={onSubmit} className="mt-4 space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-[var(--igh-secondary)]">Pagamento</label>
+          <div className="mt-1 grid gap-3 sm:grid-cols-2">
+            <div>
+              <div className="text-xs text-[var(--igh-muted)]">Tipo</div>
+              <select
+                required
+                className="mt-1 w-full rounded-lg border border-[var(--igh-border)] bg-[var(--background)] px-3 py-2 text-sm"
+                value={paymentPreferenceMethod}
+                onChange={(e) => setPaymentPreferenceMethod(e.target.value as typeof paymentPreferenceMethod)}
+              >
+                <option value="PIX">Pix</option>
+                <option value="DINHEIRO">Dinheiro</option>
+                <option value="CARTAO">Cartão</option>
+                <option value="TRANSFERENCIA">Transferência</option>
+                <option value="OUTRO">Outro</option>
+              </select>
+            </div>
+            <div>
+              <div className="text-xs text-[var(--igh-muted)]">Parcelas</div>
+              <select
+                required={paymentPreferenceMethod === "CARTAO"}
+                disabled={paymentPreferenceMethod !== "CARTAO"}
+                className="mt-1 w-full rounded-lg border border-[var(--igh-border)] bg-[var(--background)] px-3 py-2 text-sm disabled:opacity-60"
+                value={paymentPreferenceInstallments}
+                onChange={(e) => setPaymentPreferenceInstallments(Number(e.target.value))}
+              >
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                  <option key={n} value={n}>
+                    {n}x
+                  </option>
+                ))}
+              </select>
+              {paymentPreferenceMethod !== "CARTAO" ? (
+                <div className="mt-1 text-xs text-[var(--igh-muted)]">Disponível apenas para pagamento no cartão.</div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-[var(--igh-secondary)]">Quantidade de pessoas</label>
           <div className="mt-1 grid grid-cols-2 gap-3">
@@ -286,7 +389,22 @@ export function PackageReservationForm({
                         <div className="text-xs text-[var(--igh-muted)]">Adulto #{idx + 1}</div>
                         <div className="text-xs text-[var(--igh-muted)]">Adulto #{idx + 1}</div>
                       </div>
-                      <div className="mt-2 grid grid-cols-2 gap-3">
+                      <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                        <div className="sm:col-span-2">
+                          <div className="text-xs text-[var(--igh-muted)]">Nome completo</div>
+                          <input
+                            required
+                            className="mt-1 w-full rounded-lg border border-[var(--igh-border)] bg-[var(--background)] px-3 py-2 text-sm"
+                            value={adultNames[idx] ?? ""}
+                            onChange={(e) =>
+                              setAdultNames((prev) => {
+                                const next = prev.slice();
+                                next[idx] = e.target.value;
+                                return next;
+                              })
+                            }
+                          />
+                        </div>
                         <div>
                           <div className="text-xs text-[var(--igh-muted)]">Tamanho camisa</div>
                           <select
@@ -308,7 +426,7 @@ export function PackageReservationForm({
                           </select>
                         </div>
                         <div>
-                          <div className="text-xs text-[var(--igh-muted)]">Café da manhã</div>
+                          <div className="text-xs text-[var(--igh-muted)]">Kit café</div>
                           <label className="mt-2 flex items-center gap-2 text-sm text-[var(--igh-secondary)]">
                             <input
                               type="checkbox"
@@ -323,7 +441,7 @@ export function PackageReservationForm({
                               }
                             />
                             {breakfastKitAvailable ? (
-                              <span>Café da manhã (+ {formatBrl(breakfastKitPrice)})</span>
+                              <span>Kit café (+ {formatBrl(breakfastKitPrice)})</span>
                             ) : (
                               <span className="text-[var(--igh-muted)]">Indisponível</span>
                             )}
@@ -341,28 +459,62 @@ export function PackageReservationForm({
                 <div className="text-sm font-medium text-[var(--igh-secondary)]">Crianças</div>
                 <div className="mt-2 space-y-2">
                   {Array.from({ length: childrenCount }, (_, cidx) => {
-                    const globalIdx = adultsCount + cidx;
                     return (
                       <div key={`c-${cidx}`} className="rounded-md border border-[var(--igh-border)] bg-[var(--card-bg)] p-3">
                         <div className="text-xs text-[var(--igh-muted)]">Criança #{cidx + 1}</div>
-                        <div className="mt-2">
-                          <div className="text-xs text-[var(--igh-muted)]">Idade / número da camisa</div>
-                          <input
-                            type="number"
-                            min={1}
-                            max={120}
-                            required
-                            placeholder="Ex.: 6, 8, 10, 12"
-                            className="mt-1 w-full rounded-lg border border-[var(--igh-border)] bg-[var(--background)] px-3 py-2 text-sm"
-                            value={childrenShirtNumbers[cidx] ?? 0}
-                            onChange={(e) =>
-                              setChildrenShirtNumbers((prev) => {
-                                const next = prev.slice();
-                                next[cidx] = Number(e.target.value);
-                                return next;
-                              })
-                            }
-                          />
+                        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                          <div className="sm:col-span-2">
+                            <div className="text-xs text-[var(--igh-muted)]">Nome completo</div>
+                            <input
+                              required
+                              className="mt-1 w-full rounded-lg border border-[var(--igh-border)] bg-[var(--background)] px-3 py-2 text-sm"
+                              value={childrenNames[cidx] ?? ""}
+                              onChange={(e) =>
+                                setChildrenNames((prev) => {
+                                  const next = prev.slice();
+                                  next[cidx] = e.target.value;
+                                  return next;
+                                })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <div className="text-xs text-[var(--igh-muted)]">Idade</div>
+                            <input
+                              type="number"
+                              min={6}
+                              max={10}
+                              required
+                              className="mt-1 w-full rounded-lg border border-[var(--igh-border)] bg-[var(--background)] px-3 py-2 text-sm"
+                              value={childrenAges[cidx] ?? 6}
+                              onChange={(e) =>
+                                setChildrenAges((prev) => {
+                                  const next = prev.slice();
+                                  next[cidx] = Number(e.target.value);
+                                  return next;
+                                })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <div className="text-xs text-[var(--igh-muted)]">Tamanho da camisa</div>
+                            <input
+                              type="number"
+                              min={1}
+                              max={120}
+                              required
+                              placeholder="Ex.: 6, 8, 10, 12"
+                              className="mt-1 w-full rounded-lg border border-[var(--igh-border)] bg-[var(--background)] px-3 py-2 text-sm"
+                              value={childrenShirtNumbers[cidx] ?? 0}
+                              onChange={(e) =>
+                                setChildrenShirtNumbers((prev) => {
+                                  const next = prev.slice();
+                                  next[cidx] = Number(e.target.value);
+                                  return next;
+                                })
+                              }
+                            />
+                          </div>
                         </div>
                         <div className="mt-2 text-xs text-[var(--igh-muted)]">
                           Kit café: <span className="font-medium">apenas para adultos</span>

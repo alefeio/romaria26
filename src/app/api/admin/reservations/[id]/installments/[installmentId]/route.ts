@@ -4,6 +4,7 @@ import { jsonErr, jsonOk } from "@/lib/http";
 import { adminPatchInstallmentSchema } from "@/lib/validators/payments";
 import { recalcReservationPaymentStatus } from "@/lib/payments/reservation-payments";
 import { createAuditLog } from "@/lib/audit";
+import { sendReservationVouchersIfPaid } from "@/lib/vouchers/reservation-vouchers";
 
 function isUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
@@ -61,7 +62,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
         },
       });
 
-      await recalcReservationPaymentStatus(tx, id);
+      const payUpdated = await recalcReservationPaymentStatus(tx, id);
 
       await createAuditLog({
         entityType: "Reservation",
@@ -71,7 +72,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
         performedByUserId: auth.id,
       });
 
-      return { ok: row };
+      return { ok: row, paymentStatus: payUpdated?.paymentStatus ?? null };
     }
 
     if (d.status === "PAID" && inst.status === "PAID") {
@@ -123,7 +124,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
       performedByUserId: auth.id,
     });
 
-    return { ok: row };
+    return { ok: row, paymentStatus: null };
   });
 
   if ("err" in updated && updated.err === "NOT_FOUND") {
@@ -138,6 +139,10 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
   }
 
   if (!("ok" in updated)) return jsonErr("UNKNOWN", "Falha ao atualizar parcela.", 500);
+
+  if (updated.paymentStatus === "PAID") {
+    await sendReservationVouchersIfPaid(id, auth.id).catch(() => null);
+  }
 
   return jsonOk({
     installment: {

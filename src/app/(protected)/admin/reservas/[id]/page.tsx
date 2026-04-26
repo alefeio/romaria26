@@ -28,6 +28,7 @@ export default async function AdminReservaDetailPage({ params }: Props) {
     include: {
       user: { select: { id: true, name: true, email: true } },
       package: { select: { id: true, name: true, slug: true, departureDate: true, departureTime: true, boardingLocation: true } },
+      vouchers: { orderBy: [{ personType: "asc" }, { personIndex: "asc" }] },
     },
   });
 
@@ -136,6 +137,49 @@ export default async function AdminReservaDetailPage({ params }: Props) {
           <div className="card-body whitespace-pre-wrap text-sm">{r.notes}</div>
         </div>
       ) : null}
+
+      <div className="mt-6 card">
+        <div className="card-header">Vouchers</div>
+        <div className="card-body text-sm">
+          {r.vouchers.length === 0 ? (
+            <div className="text-[var(--text-muted)]">Nenhum voucher gerado ainda.</div>
+          ) : (
+            <div className="space-y-2">
+              {r.vouchers.map((v) => {
+                const label = v.personType === "ADULT" ? `Adulto #${v.personIndex + 1}` : `Criança #${v.personIndex + 1}`;
+                return (
+                  <div key={v.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--card-border)] bg-[var(--igh-surface)] px-3 py-2">
+                    <div>
+                      <div className="text-xs text-[var(--text-muted)]">{label}</div>
+                      <div className="font-medium">{v.name}</div>
+                      <div className="text-xs text-[var(--text-muted)]">
+                        Nº: <span className="font-mono font-semibold text-[var(--text-primary)]">{v.code}</span>
+                        {" · "}Camisa: {v.shirtSize}
+                        {v.personType === "CHILD" && v.age ? ` · Idade: ${v.age}` : ""}
+                        {" · "}Kit café: {v.personType === "ADULT" ? (v.hasBreakfastKit ? "Sim" : "Não") : "—"}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/admin/vouchers/${encodeURIComponent(v.code)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-[var(--igh-primary)] hover:underline"
+                      >
+                        Abrir voucher
+                      </Link>
+                      <span className="text-xs text-[var(--text-muted)]">{v.usedAt ? "Usado" : "Não usado"}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className="mt-3 text-xs text-[var(--text-muted)]">
+            Obs.: os vouchers são enviados por e-mail automaticamente quando o pagamento fica 100% quitado.
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

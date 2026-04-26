@@ -41,6 +41,7 @@ export default function AdminFaturamentoPage() {
   const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<Billing | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
@@ -54,14 +55,41 @@ export default function AdminFaturamentoPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const res = await fetch(`/api/admin/billing/summary${qs}`);
-      const json = (await res.json()) as ApiResponse<Billing>;
+      const res = await fetch(`/api/admin/billing/summary${qs}`, {
+        credentials: "include",
+        cache: "no-store",
+        headers: { accept: "application/json" },
+      });
+      const raw = await res.text();
+      let json: ApiResponse<Billing>;
+      try {
+        json = raw ? (JSON.parse(raw) as ApiResponse<Billing>) : { ok: false, error: { code: "EMPTY", message: "Resposta vazia." } };
+      } catch {
+        setData(null);
+        setLoadError("Resposta inválida do servidor. Tente atualizar a página.");
+        toast.push("error", "Não foi possível ler o faturamento.");
+        return;
+      }
       if (!res.ok || !json.ok) {
-        toast.push("error", !json.ok ? json.error.message : "Falha ao carregar faturamento.");
+        const msg = json.ok === false ? json.error.message : `Erro HTTP ${res.status}`;
+        setData(null);
+        setLoadError(msg);
+        toast.push("error", msg);
+        return;
+      }
+      if (!json.data) {
+        setData(null);
+        setLoadError("Dados do faturamento ausentes na resposta.");
         return;
       }
       setData(json.data);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Falha de rede ao carregar faturamento.";
+      setData(null);
+      setLoadError(msg);
+      toast.push("error", msg);
     } finally {
       setLoading(false);
     }
@@ -99,44 +127,58 @@ export default function AdminFaturamentoPage() {
         </div>
       </div>
 
-      {loading || !data ? (
+      {loading ? (
         <p className="mt-6 text-[var(--text-secondary)]">Carregando…</p>
+      ) : loadError && !data ? (
+        <div className="mt-6 rounded-xl border border-red-200 bg-red-50/80 p-4 text-sm text-red-900 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-100">
+          <p className="font-medium">Não foi possível exibir o faturamento</p>
+          <p className="mt-1 opacity-90">{loadError}</p>
+          <Button type="button" className="mt-3" variant="secondary" onClick={() => void load()}>
+            Tentar de novo
+          </Button>
+        </div>
+      ) : !data ? (
+        <p className="mt-6 text-[var(--text-secondary)]">Sem dados.</p>
       ) : (
         <>
           <div className="mt-6 grid gap-4 lg:grid-cols-4">
             <div className="card">
               <div className="card-header">Reservas</div>
               <div className="card-body text-sm">
-                <div className="text-2xl font-semibold text-[var(--text-primary)]">{data.totals.reservationsCount}</div>
-                <div className="text-xs text-[var(--text-muted)]">Não canceladas</div>
+                <div className="text-2xl font-semibold text-[var(--text-primary)]">
+                  {data.totals.reservationsCount ?? 0}
+                </div>
+                <div className="text-xs text-[var(--text-muted)]">Não canceladas{data.range.from || data.range.to ? " (período filtrado)" : " (geral)"}</div>
               </div>
             </div>
             <div className="card">
               <div className="card-header">Vendas (devido)</div>
               <div className="card-body text-sm">
-                <div className="text-2xl font-semibold text-[var(--text-primary)]">{brl(data.totals.totalDue)}</div>
+                <div className="text-2xl font-semibold text-[var(--text-primary)]">{brl(data.totals.totalDue ?? "0")}</div>
               </div>
             </div>
             <div className="card">
               <div className="card-header">Recebido</div>
               <div className="card-body text-sm">
-                <div className="text-2xl font-semibold text-[var(--text-primary)]">{brl(data.totals.totalPaid)}</div>
+                <div className="text-2xl font-semibold text-[var(--text-primary)]">{brl(data.totals.totalPaid ?? "0")}</div>
               </div>
             </div>
             <div className="card">
               <div className="card-header">A receber</div>
               <div className="card-body text-sm">
-                <div className="text-2xl font-semibold text-[var(--text-primary)]">{brl(data.totals.totalToReceive)}</div>
+                <div className="text-2xl font-semibold text-[var(--text-primary)]">{brl(data.totals.totalToReceive ?? "0")}</div>
               </div>
             </div>
           </div>
 
           <div className="mt-8">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Parcelas em atraso</h2>
-              {data.overdue.count > 0 ? (
+              <h2 id="parcelas-atraso" className="text-lg font-semibold text-[var(--text-primary)] scroll-mt-20">
+                Parcelas em atraso
+              </h2>
+              {(data.overdue?.count ?? 0) > 0 ? (
                 <Badge tone="amber">
-                  {data.overdue.count} · {brl(data.overdue.totalAmount)}
+                  {data.overdue?.count} · {brl(data.overdue?.totalAmount ?? "0")}
                 </Badge>
               ) : (
                 <Badge tone="green">Nenhuma</Badge>
@@ -155,34 +197,45 @@ export default function AdminFaturamentoPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.overdue.items.map((i) => (
+                {(data.overdue?.items ?? []).map((i) => (
                   <tr key={i.id}>
                     <Td className="text-xs">{i.dueDate}</Td>
                     <Td>
-                      <div className="font-medium">{i.reservation.customerNameSnapshot}</div>
-                      <div className="text-xs text-[var(--text-muted)]">{i.reservation.customerPhoneSnapshot}</div>
+                      <div className="font-medium">{i.reservation?.customerNameSnapshot}</div>
+                      <div className="text-xs text-[var(--text-muted)]">{i.reservation?.customerPhoneSnapshot}</div>
                     </Td>
                     <Td>
-                      <div className="font-medium">{i.reservation.package.name}</div>
-                      <div className="text-xs text-[var(--text-muted)]">Saída {i.reservation.package.departureDate}</div>
+                      <div className="font-medium">{i.reservation?.package?.name}</div>
+                      <div className="text-xs text-[var(--text-muted)]">Saída {i.reservation?.package?.departureDate}</div>
                     </Td>
                     <Td className="text-right">{brl(i.amount)}</Td>
                     <Td>
-                      <Badge tone={i.reservation.paymentStatus === "PAID" ? "green" : i.reservation.paymentStatus === "PARTIAL" ? "amber" : "zinc"}>
-                        {i.reservation.paymentStatus}
+                      <Badge
+                        tone={
+                          i.reservation?.paymentStatus === "PAID"
+                            ? "green"
+                            : i.reservation?.paymentStatus === "PARTIAL"
+                              ? "amber"
+                              : "zinc"
+                        }
+                      >
+                        {i.reservation?.paymentStatus}
                       </Badge>
                       <div className="mt-1 text-xs text-[var(--text-muted)]">
-                        {brl(i.reservation.totalPaid)} / {brl(i.reservation.totalDue)}
+                        {brl(i.reservation?.totalPaid ?? "0")} / {brl(i.reservation?.totalDue ?? "0")}
                       </div>
                     </Td>
                     <Td className="text-right">
-                      <a className="text-sm font-medium text-[var(--igh-primary)] hover:underline" href={`/admin/reservas/${i.reservationId}/pagamentos`}>
+                      <a
+                        className="text-sm font-medium text-[var(--igh-primary)] hover:underline"
+                        href={`/admin/reservas/${i.reservationId}/pagamentos`}
+                      >
                         Abrir
                       </a>
                     </Td>
                   </tr>
                 ))}
-                {data.overdue.items.length === 0 ? (
+                {(data.overdue?.items?.length ?? 0) === 0 ? (
                   <tr>
                     <Td colSpan={6} className="py-10 text-center text-[var(--text-muted)]">
                       Nenhuma parcela em atraso.

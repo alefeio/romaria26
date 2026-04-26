@@ -5,6 +5,7 @@ import { jsonErr, jsonOk } from "@/lib/http";
 import { adminCreateInstallmentSchema } from "@/lib/validators/payments";
 import { recalcReservationPaymentStatus } from "@/lib/payments/reservation-payments";
 import { createAuditLog } from "@/lib/audit";
+import { sendReservationVouchersIfPaid } from "@/lib/vouchers/reservation-vouchers";
 
 function isUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
@@ -62,7 +63,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
           receiptUrl: inst.receiptUrl ?? null,
         },
       });
-      await recalcReservationPaymentStatus(tx, id);
+      const payUpdated = await recalcReservationPaymentStatus(tx, id);
+      return { inst, paymentStatus: payUpdated?.paymentStatus ?? null };
     }
 
     await createAuditLog({
@@ -73,11 +75,15 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       performedByUserId: auth.id,
     });
 
-    return inst;
+    return { inst, paymentStatus: null };
   });
 
   if (!created) return jsonErr("NOT_FOUND", "Reserva não encontrada.", 404);
 
-  return jsonOk({ installment: { id: created.id } }, { status: 201 });
+  if (created.paymentStatus === "PAID") {
+    await sendReservationVouchersIfPaid(id, auth.id).catch(() => null);
+  }
+
+  return jsonOk({ installment: { id: created.inst.id } }, { status: 201 });
 }
 

@@ -5,6 +5,7 @@ import { adminCustomerCreateSchema } from "@/lib/validators/customers";
 import { hashPassword } from "@/lib/auth";
 import { generateTempPassword } from "@/lib/password";
 import { createAuditLog } from "@/lib/audit";
+import { generateCustomerPlaceholderEmail } from "@/lib/customer-placeholder-email";
 
 export async function GET() {
   const auth = await requireAdminApi();
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
   }
 
   const d = parsed.data;
-  const email = d.email.trim().toLowerCase();
+  const email = d.email.trim() ? d.email.trim().toLowerCase() : generateCustomerPlaceholderEmail();
 
   const existing = await prisma.user.findUnique({
     where: { email },
