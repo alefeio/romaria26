@@ -44,8 +44,8 @@ export default async function ClienteVoucherPage({ params }: Props) {
   if (v.reservation.userId !== user.id) notFound();
 
   const base = await resolvePublicAppUrl();
-  const checkinUrl = `${base}/voucher/${encodeURIComponent(v.code)}`;
-  const qrDataUrl = await QRCode.toDataURL(checkinUrl, { margin: 1, scale: 8 });
+  const checkinUrl = `${base}/admin/vouchers/${encodeURIComponent(v.code)}/checkin`;
+  const qrDataUrl = v.usedAt ? null : await QRCode.toDataURL(checkinUrl, { margin: 1, scale: 8 });
   const label = v.personType === "ADULT" ? `Adulto #${v.personIndex + 1}` : `Criança #${v.personIndex + 1}`;
   const age = v.personType === "CHILD" && v.age ? v.age : null;
 
@@ -66,9 +66,23 @@ export default async function ClienteVoucherPage({ params }: Props) {
       <div className="mt-6 grid gap-4 lg:grid-cols-[320px_1fr]">
         <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">QR Code</div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={qrDataUrl} alt="QR Code do voucher" className="mt-3 h-64 w-64 rounded-lg border border-[var(--card-border)] bg-white object-contain" />
-          <div className="mt-3 text-xs text-[var(--text-muted)]">Apresente na entrada para validação pelo administrador.</div>
+          {v.usedAt ? (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+              Este voucher já foi utilizado. O QR Code não está mais disponível.
+            </div>
+          ) : (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={qrDataUrl ?? undefined}
+                alt="QR Code do voucher"
+                className="mt-3 h-64 w-64 rounded-lg border border-[var(--card-border)] bg-white object-contain"
+              />
+              <div className="mt-3 text-xs text-[var(--text-muted)]">
+                Apresente na entrada para validação pelo administrador.
+              </div>
+            </>
+          )}
         </div>
 
         <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
