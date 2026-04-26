@@ -159,6 +159,14 @@ export default async function DashboardPage() {
           <p className="mt-2 text-3xl font-semibold text-[var(--text-primary)]">{data.reservationsTotal}</p>
           <p className="mt-1 text-xs text-[var(--text-muted)]">incluindo confirmadas e canceladas</p>
         </Link>
+        <Link
+          href="/admin/vouchers/scan"
+          className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 shadow-sm transition hover:border-[var(--igh-primary)]"
+        >
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">Check-in</p>
+          <p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">Validar voucher</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Abrir câmera para ler QR Code</p>
+        </Link>
       </div>
 
       <p className="mt-6 flex flex-wrap gap-x-4 gap-y-2 text-sm">
@@ -182,6 +190,9 @@ export default async function DashboardPage() {
         </Link>
         <Link href="/admin/site/configuracoes" className="text-[var(--igh-primary)] hover:underline">
           Site
+        </Link>
+        <Link href="/admin/vouchers/scan" className="text-[var(--igh-primary)] hover:underline">
+          Validar voucher
         </Link>
       </p>
 

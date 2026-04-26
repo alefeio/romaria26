@@ -20,6 +20,7 @@ const ITEMS: Item[] = [
   { href: "/dashboard", label: "Painel", alwaysShow: true, category: "Início" },
   { href: "/admin/pacotes", label: "Pacotes", adminOrMaster: true, category: "Operação" },
   { href: "/admin/reservas", label: "Reservas", adminOrMaster: true, category: "Operação" },
+  { href: "/admin/vouchers/scan", label: "Validar vouchers (câmera)", adminOrMaster: true, category: "Operação" },
   { href: "/admin/clientes", label: "Clientes", adminOrMaster: true, category: "Operação" },
   { href: "/admin/faturamento", label: "Faturamento", adminOrMaster: true, category: "Operação" },
   { href: "/admin/sms", label: "Campanhas SMS", adminOrMaster: true, category: "Operação" },

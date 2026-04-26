@@ -1,10 +1,10 @@
 import "server-only";
 
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import QRCode from "qrcode";
 
-import { requireRole } from "@/lib/auth";
+import { getSessionUserFromCookie } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolvePublicAppUrl } from "@/lib/email";
 import { BRAZIL_TIMEZONE } from "@/lib/datetime-brazil";
@@ -22,7 +22,15 @@ function formatWhen(d: Date, time: string): string {
 }
 
 export default async function ClienteVoucherPage({ params }: Props) {
-  const user = await requireRole(["CUSTOMER"]);
+  const user = await getSessionUserFromCookie();
+  if (!user) redirect("/login");
+  if (user.role === "ADMIN" || user.role === "MASTER") {
+    const { code } = await params;
+    const c = decodeURIComponent(code ?? "").trim();
+    if (!c) notFound();
+    redirect(`/admin/vouchers/${encodeURIComponent(c)}`);
+  }
+  if (user.role !== "CUSTOMER") notFound();
   const { code } = await params;
   const c = decodeURIComponent(code ?? "").trim();
   if (!c) notFound();
