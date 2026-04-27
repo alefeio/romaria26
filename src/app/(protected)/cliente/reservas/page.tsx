@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Table, Td, Th } from "@/components/ui/Table";
@@ -12,6 +12,7 @@ type Row = {
   quantity: number;
   includesBreakfastKit: boolean;
   totalPrice: string;
+  paymentStatus: string;
   status: string;
   reservedAt: string;
   confirmedAt: string | null;
@@ -93,7 +94,7 @@ export default function ClienteReservasPage() {
             </thead>
             <tbody>
               {items.map((r) => (
-                <div key={r.id} className="contents">
+                <Fragment key={r.id}>
                   <tr>
                     <Td>
                       <Link href={`/passeios/${r.package.slug}`} className="font-medium text-[var(--igh-primary)] hover:underline">
@@ -143,15 +144,19 @@ export default function ClienteReservasPage() {
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-3">
-                                    <a
-                                      href={`/cliente/vouchers/${encodeURIComponent(v.code)}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-sm font-medium text-[var(--igh-primary)] hover:underline"
-                                    >
-                                      Abrir
-                                    </a>
-                                    <span className="text-xs text-[var(--text-muted)]">{v.usedAt ? "Usado" : "Não usado"}</span>
+                                    {r.paymentStatus === "PAID" ? (
+                                      <>
+                                        <a
+                                          href={`/cliente/vouchers/${encodeURIComponent(v.code)}`}
+                                          className="text-sm font-medium text-[var(--igh-primary)] hover:underline"
+                                        >
+                                          Abrir
+                                        </a>
+                                        <span className="text-xs text-[var(--text-muted)]">{v.usedAt ? "Usado" : "Não usado"}</span>
+                                      </>
+                                    ) : (
+                                      <span className="text-xs font-medium text-amber-700 dark:text-amber-200">Não quitado</span>
+                                    )}
                                   </div>
                                 </div>
                               );
@@ -161,7 +166,7 @@ export default function ClienteReservasPage() {
                       </Td>
                     </tr>
                   ) : null}
-                </div>
+                </Fragment>
               ))}
             </tbody>
           </Table>

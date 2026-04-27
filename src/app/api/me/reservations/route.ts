@@ -62,6 +62,7 @@ export async function GET() {
       breakfastKitSelections: r.breakfastKitSelections,
       includesBreakfastKit: r.includesBreakfastKit,
       totalPrice: r.totalPrice.toString(),
+      paymentStatus: r.paymentStatus,
       status: r.status,
       notes: r.notes,
       kitsDeliveryInfoSnapshot: r.kitsDeliveryInfoSnapshot ?? null,

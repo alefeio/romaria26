@@ -49,20 +49,56 @@ export default async function ClienteVoucherPage({ params }: Props) {
     },
   });
   if (!v) notFound();
-  if (v.reservation.userId !== user.id) notFound();
+  if (v.reservation.userId !== user.id) {
+    return (
+      <main className="container-page py-8">
+        <div className="mb-4">
+          <Link href="/cliente/reservas" className="text-sm text-[var(--igh-primary)] hover:underline">
+            ← Minhas reservas
+          </Link>
+        </div>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
+          <h1 className="text-xl font-semibold text-amber-900 dark:text-amber-100">Você não tem acesso a este voucher</h1>
+          <p className="mt-2 text-sm text-amber-800/90 dark:text-amber-200/90">
+            Este voucher pertence a outra conta. Volte para <span className="font-medium">Minhas reservas</span> para acessar seus vouchers.
+          </p>
+          <div className="mt-4">
+            <Link href="/cliente/reservas" className="text-sm font-medium text-[var(--igh-primary)] hover:underline">
+              Ir para Minhas reservas
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const ordered = await prisma.reservationVoucher.findMany({
+    where: { reservationId: v.reservationId },
+    orderBy: [{ personType: "asc" }, { personIndex: "asc" }],
+    select: { code: true },
+  });
+  const codes = ordered.map((x) => x.code);
+  const idx = codes.indexOf(v.code);
+  const nextCode = idx >= 0 && idx < codes.length - 1 ? codes[idx + 1] : null;
 
   const base = await resolvePublicAppUrl();
   const checkinUrl = `${base}/admin/vouchers/${encodeURIComponent(v.code)}/checkin`;
-  const qrDataUrl = v.usedAt ? null : await QRCode.toDataURL(checkinUrl, { margin: 1, scale: 8 });
+  const canValidate = v.reservation.paymentStatus === "PAID";
+  const qrDataUrl = v.usedAt || !canValidate ? null : await QRCode.toDataURL(checkinUrl, { margin: 1, scale: 8 });
   const label = v.personType === "ADULT" ? `Adulto #${v.personIndex + 1}` : `Criança #${v.personIndex + 1}`;
   const age = v.personType === "CHILD" && v.age ? v.age : null;
 
   return (
     <main className="container-page py-8">
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Link href="/cliente/reservas" className="text-sm text-[var(--igh-primary)] hover:underline">
           ← Minhas reservas
         </Link>
+        {nextCode ? (
+          <Link href={`/cliente/vouchers/${encodeURIComponent(nextCode)}`} className="text-sm text-[var(--igh-primary)] hover:underline">
+            Próximo →
+          </Link>
+        ) : null}
       </div>
 
       <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Meu voucher</h1>
@@ -77,6 +113,10 @@ export default async function ClienteVoucherPage({ params }: Props) {
           {v.usedAt ? (
             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
               Este voucher já foi utilizado. O QR Code não está mais disponível.
+            </div>
+          ) : !canValidate ? (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+              Este voucher ainda não pode ser validado. Para liberar a validação, o valor pendente precisa estar <strong>100% quitado</strong>.
             </div>
           ) : (
             <>
@@ -107,7 +147,9 @@ export default async function ClienteVoucherPage({ params }: Props) {
           <div className="mt-1 text-xs text-[var(--text-muted)]">
             Pagamento da reserva: <span className="font-medium">{v.reservation.paymentStatus}</span>
           </div>
-          <div className="mt-4 text-xs text-[var(--text-muted)] break-all">{checkinUrl}</div>
+          {canValidate && !v.usedAt ? (
+            <div className="mt-4 text-xs text-[var(--text-muted)] break-all">{checkinUrl}</div>
+          ) : null}
         </div>
       </div>
     </main>

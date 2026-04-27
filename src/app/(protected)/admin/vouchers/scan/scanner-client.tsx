@@ -6,14 +6,35 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 
 function extractVoucherCode(raw: string): string | null {
+  const direct = raw?.trim() ?? "";
+  // fallback rápido: achar um código numérico 4 dígitos em qualquer lugar (ex.: URLs completas)
+  const m4 = direct.match(/\b(\d{4})\b/);
+  if (m4?.[1]) return m4[1];
+
   try {
     const u = new URL(raw);
     const parts = u.pathname.split("/").filter(Boolean);
+    // suportar:
+    // - /admin/vouchers/:code/checkin
+    // - /admin/vouchers/:code
+    // - /voucher/:code
+    // - valor puro "0001"
+    const vouchersIdx = parts.indexOf("vouchers");
+    if (vouchersIdx >= 0) {
+      const maybeCode = parts[vouchersIdx + 1] ?? "";
+      if (maybeCode && maybeCode.toLowerCase() !== "checkin") return decodeURIComponent(maybeCode);
+    }
+    const voucherIdx = parts.indexOf("voucher");
+    if (voucherIdx >= 0) {
+      const maybeCode = parts[voucherIdx + 1] ?? "";
+      if (maybeCode && maybeCode.toLowerCase() !== "checkin") return decodeURIComponent(maybeCode);
+    }
+    // fallback: último segmento, mas ignora "checkin"
     const last = parts[parts.length - 1] ?? "";
-    if (!last) return null;
+    if (!last || last.toLowerCase() === "checkin") return null;
     return decodeURIComponent(last);
   } catch {
-    return raw?.trim() ? raw.trim() : null;
+    return direct ? direct : null;
   }
 }
 

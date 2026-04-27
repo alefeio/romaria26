@@ -25,7 +25,8 @@ export default async function DashboardPage() {
   let data: Awaited<ReturnType<typeof getRomariaAdminDashboard>>;
   try {
     data = await getRomariaAdminDashboard();
-  } catch {
+  } catch (e) {
+    console.error("[dashboard] getRomariaAdminDashboard failed", e);
     return (
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
         <h2 className="text-lg font-semibold text-amber-800 dark:text-amber-200">Não foi possível carregar o painel</h2>
