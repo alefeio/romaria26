@@ -30,11 +30,15 @@ export function getSiteUploadFolder(
     | "about"
     | "contato"
     | "packages"
+    | "gallery"
 ): string {
   return `${SITE_UPLOAD_PREFIX}/${kind}`.replace(/\/+/g, "/");
 }
 
-export function getSiteUploadFolderWithId(kind: "banners" | "projects" | "news" | "transparency", id: string): string {
+export function getSiteUploadFolderWithId(
+  kind: "banners" | "projects" | "news" | "transparency" | "gallery",
+  id: string
+): string {
   return `${SITE_UPLOAD_PREFIX}/${kind}/${id}`.replace(/\/+/g, "/");
 }
 

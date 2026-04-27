@@ -329,6 +329,31 @@ model SiteBanner {
   updatedAt DateTime @updatedAt
 }
 
+model SiteGalleryYear {
+  id        String            @id @default(uuid())
+  year      Int               @unique
+  title     String?
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  photos    SiteGalleryPhoto[]
+
+  @@index([year])
+  @@index([isActive])
+}
+
+model SiteGalleryPhoto {
+  id        String          @id @default(uuid())
+  yearId    String
+  imageUrl  String
+  caption   String?
+  order     Int             @default(0)
+  createdAt DateTime        @default(now())
+  year      SiteGalleryYear @relation(fields: [yearId], references: [id], onDelete: Cascade)
+
+  @@index([yearId, order])
+}
+
 model TabletBanner {
   id        String   @id @default(uuid())
   title     String?

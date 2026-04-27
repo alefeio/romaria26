@@ -197,6 +197,84 @@ export async function getTestimonials(): Promise<TestimonialPublic[]> {
   }
 }
 
+// --- Galeria (site público) ---
+export type SiteGalleryYearPublic = {
+  id: string;
+  year: number;
+  title: string | null;
+  coverImageUrl: string | null;
+  photosCount: number;
+};
+
+export async function getGalleryYearsForSite(): Promise<SiteGalleryYearPublic[]> {
+  try {
+    const items = await prisma.siteGalleryYear.findMany({
+      where: { isActive: true },
+      orderBy: [{ year: "desc" }],
+      include: {
+        photos: { take: 1, orderBy: [{ order: "asc" }, { createdAt: "desc" }] },
+        _count: { select: { photos: true } },
+      },
+    });
+    return items.map((y) => ({
+      id: y.id,
+      year: y.year,
+      title: y.title,
+      coverImageUrl: y.photos[0]?.imageUrl ?? null,
+      photosCount: y._count.photos,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export type SiteGalleryPhotoPublic = { id: string; imageUrl: string; caption: string | null };
+
+export async function getGalleryPhotosForYear(
+  year: number
+): Promise<{ year: number; title: string | null; photos: SiteGalleryPhotoPublic[] } | null> {
+  try {
+    const y = await prisma.siteGalleryYear.findUnique({
+      where: { year },
+      include: { photos: { orderBy: [{ order: "asc" }, { createdAt: "desc" }] } },
+    });
+    if (!y || !y.isActive) return null;
+    return {
+      year: y.year,
+      title: y.title,
+      photos: y.photos.map((p) => ({ id: p.id, imageUrl: p.imageUrl, caption: p.caption })),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export type SiteGalleryLatestPhotoPublic = {
+  id: string;
+  imageUrl: string;
+  caption: string | null;
+  year: number;
+};
+
+export async function getLatestGalleryPhotosForSite(limit = 8): Promise<SiteGalleryLatestPhotoPublic[]> {
+  try {
+    const list = await prisma.siteGalleryPhoto.findMany({
+      where: { year: { isActive: true } },
+      orderBy: [{ createdAt: "desc" }],
+      take: Math.max(1, Math.min(24, limit)),
+      select: {
+        id: true,
+        imageUrl: true,
+        caption: true,
+        year: { select: { year: true } },
+      },
+    });
+    return list.map((p) => ({ id: p.id, imageUrl: p.imageUrl, caption: p.caption, year: p.year.year }));
+  } catch {
+    return [];
+  }
+}
+
 // --- Projetos (site público) ---
 export type ProjectForSite = {
   id: string;

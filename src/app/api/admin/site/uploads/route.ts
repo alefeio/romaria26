@@ -17,6 +17,7 @@ const kindSchema = z.enum([
   "about",
   "contato",
   "packages",
+  "gallery",
 ]);
 
 export async function POST(request: Request) {
@@ -42,18 +43,18 @@ export async function POST(request: Request) {
   const kind = kindParsed.data;
 
   const id = typeof idRaw === "string" && idRaw.length > 0 ? idRaw : undefined;
-  const kindWithOptionalEntityId = ["banners", "projects", "news", "transparency"] as const;
+  const kindWithOptionalEntityId = ["banners", "projects", "news", "transparency", "gallery"] as const;
   if (kindWithOptionalEntityId.includes(kind as (typeof kindWithOptionalEntityId)[number])) {
     if (id && !z.string().uuid().safeParse(id).success) {
       return jsonErr("VALIDATION_ERROR", "id deve ser um UUID válido.", 400);
     }
   } else if (id) {
-    return jsonErr("VALIDATION_ERROR", "id só é permitido para banners, projects, news ou transparency.", 400);
+    return jsonErr("VALIDATION_ERROR", "id só é permitido para banners, projects, news, transparency ou gallery.", 400);
   }
 
   let folder: string;
   if (id && kindWithOptionalEntityId.includes(kind as (typeof kindWithOptionalEntityId)[number])) {
-    folder = getSiteUploadFolderWithId(kind as "banners" | "projects" | "news" | "transparency", id);
+    folder = getSiteUploadFolderWithId(kind as "banners" | "projects" | "news" | "transparency" | "gallery", id);
   } else {
     folder = getSiteUploadFolder(kind);
   }

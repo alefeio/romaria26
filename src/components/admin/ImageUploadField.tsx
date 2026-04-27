@@ -14,7 +14,8 @@ export type SiteUploadKind =
   | "transparency"
   | "about"
   | "contato"
-  | "packages";
+  | "packages"
+  | "gallery";
 
 type Props = {
   kind: SiteUploadKind;

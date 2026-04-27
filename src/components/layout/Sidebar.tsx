@@ -34,6 +34,7 @@ const ITEMS: Item[] = [
   { href: "/admin/site/banners", label: "Banners", adminOrMaster: true, category: "Site" },
   { href: "/admin/site/depoimentos", label: "Depoimentos", adminOrMaster: true, category: "Site" },
   { href: "/admin/site/parceiros", label: "Parceiros", adminOrMaster: true, category: "Site" },
+  { href: "/admin/site/galeria", label: "Galeria de fotos", adminOrMaster: true, category: "Site" },
   { href: "/admin/site/noticias", label: "Notícias", adminOrMaster: true, category: "Site" },
   { href: "/admin/site/faq", label: "FAQ", adminOrMaster: true, category: "Site" },
   { href: "/backup", label: "Backup do banco", masterOnly: true, category: "Sistema" },

@@ -16,6 +16,7 @@ import {
   getPartners,
   getFaqItems,
   getTestimonials,
+  getLatestGalleryPhotosForSite,
   getNewsPostsForSite,
   getPackagesForPublicSite,
   getSiteSettings,
@@ -33,13 +34,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const [settings, banners, partners, faqItemsFromDb, testimonialsFromDb, newsPosts, packagesPublic] =
+  const [settings, banners, partners, faqItemsFromDb, testimonialsFromDb, latestGalleryPhotos, newsPosts, packagesPublic] =
     await Promise.all([
       getSiteSettings(),
       getBanners(),
       getPartners(),
       getFaqItems(),
       getTestimonials(),
+      getLatestGalleryPhotosForSite(9),
       getNewsPostsForSite(),
       getPackagesForPublicSite(),
     ]);
@@ -123,6 +125,42 @@ export default async function HomePage() {
               </li>
             ))}
           </ul>
+        </Section>
+      ) : null}
+
+      {latestGalleryPhotos.length > 0 ? (
+        <Section title="Galeria" subtitle="As últimas fotos publicadas.">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {latestGalleryPhotos.map((p) => (
+              <a
+                key={p.id}
+                href={`/galeria/${p.year}`}
+                className="group overflow-hidden rounded-xl border border-[var(--igh-border)] bg-white"
+                title={p.caption ?? `Ver fotos de ${p.year}`}
+              >
+                <img
+                  src={p.imageUrl}
+                  alt={p.caption ?? ""}
+                  className="h-52 w-full object-cover transition-transform group-hover:scale-[1.02]"
+                  loading="lazy"
+                />
+                <div className="flex items-center justify-between gap-3 border-t border-[var(--igh-border)] px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-[var(--igh-secondary)]">{p.year}</div>
+                    <div className="truncate text-xs text-[var(--igh-muted)]">{p.caption ?? "Ver galeria do ano"}</div>
+                  </div>
+                  <span className="shrink-0 rounded-md bg-[var(--igh-surface)] px-2 py-1 text-[11px] font-semibold text-[var(--igh-muted)]">
+                    Abrir
+                  </span>
+                </div>
+              </a>
+            ))}
+          </div>
+          <div className="mt-8 text-center">
+            <Button as="link" href="/galeria" variant="outline" size="lg">
+              Ver galeria completa
+            </Button>
+          </div>
         </Section>
       ) : null}
 
