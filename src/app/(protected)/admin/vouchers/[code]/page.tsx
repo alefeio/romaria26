@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolvePublicAppUrl } from "@/lib/email";
 import { AdminSendVoucherButton } from "./send-voucher-button";
+import { Button } from "@/components/ui/Button";
 
 type Props = { params: Promise<{ code: string }> };
 
@@ -35,6 +36,8 @@ export default async function AdminVoucherDetailPage({ params }: Props) {
 
   const base = await resolvePublicAppUrl();
   const checkinUrl = `${base}/voucher/${encodeURIComponent(v.code)}`;
+  const viewUrl = `${base}/voucher/${encodeURIComponent(v.code)}`;
+  const whatsappShareHref = `https://wa.me/?text=${encodeURIComponent(`Voucher: ${viewUrl}`)}`;
   const qrDataUrl = await QRCode.toDataURL(checkinUrl, { margin: 1, scale: 8 });
   const label = v.personType === "ADULT" ? `Adulto #${v.personIndex + 1}` : `Criança #${v.personIndex + 1}`;
 
@@ -44,7 +47,14 @@ export default async function AdminVoucherDetailPage({ params }: Props) {
         <Link href={`/admin/reservas/${v.reservationId}`} className="text-sm text-[var(--igh-primary)] hover:underline">
           ← Voltar para reserva
         </Link>
-        <AdminSendVoucherButton code={v.code} />
+        <div className="flex flex-wrap items-center gap-2">
+          <a href={whatsappShareHref} target="_blank" rel="noopener noreferrer">
+            <Button type="button" variant="secondary" size="sm">
+              Compartilhar no WhatsApp
+            </Button>
+          </a>
+          <AdminSendVoucherButton code={v.code} />
+        </div>
       </div>
 
       <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Voucher (admin)</h1>

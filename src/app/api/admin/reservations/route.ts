@@ -26,16 +26,27 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
   const packageId = searchParams.get("packageId");
+  const q = (searchParams.get("q") ?? "").trim();
 
   const where: {
     status?: "PENDING" | "CONFIRMED" | "CANCELLED";
     packageId?: string;
+    OR?: any;
   } = {};
   if (status === "PENDING" || status === "CONFIRMED" || status === "CANCELLED") {
     where.status = status;
   }
   if (packageId && /^[0-9a-f-]{36}$/i.test(packageId)) {
     where.packageId = packageId;
+  }
+  if (q) {
+    where.OR = [
+      { customerNameSnapshot: { contains: q, mode: "insensitive" } },
+      { customerEmailSnapshot: { contains: q, mode: "insensitive" } },
+      { customerPhoneSnapshot: { contains: q, mode: "insensitive" } },
+      { user: { name: { contains: q, mode: "insensitive" } } },
+      { user: { email: { contains: q, mode: "insensitive" } } },
+    ];
   }
 
   const rows = await prisma.reservation.findMany({

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Modal } from "@/components/ui/Modal";
+import { isVideoUrl } from "@/lib/media-url";
 
 type Photo = { id: string; imageUrl: string; caption: string | null };
 
@@ -67,13 +68,23 @@ export function GalleryYearLightbox({
             className="group overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] text-left focus:outline-none focus:ring-2 focus:ring-[var(--igh-primary)]"
             title={p.caption ?? ""}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={p.imageUrl}
-              alt={p.caption ?? ""}
-              className="h-56 w-full object-cover transition-transform group-hover:scale-[1.02]"
-              loading="lazy"
-            />
+            {isVideoUrl(p.imageUrl) ? (
+              <video
+                src={p.imageUrl}
+                className="h-56 w-full object-cover bg-black/5 transition-transform group-hover:scale-[1.02]"
+                muted
+                playsInline
+                preload="metadata"
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={p.imageUrl}
+                alt={p.caption ?? ""}
+                className="h-56 w-full object-cover transition-transform group-hover:scale-[1.02]"
+                loading="lazy"
+              />
+            )}
             {p.caption ? (
               <div className="border-t border-[var(--card-border)] p-3 text-xs text-[var(--text-secondary)]">{p.caption}</div>
             ) : null}
@@ -90,8 +101,18 @@ export function GalleryYearLightbox({
         {!current ? null : (
           <div className="flex flex-col gap-3">
             <div className="relative overflow-hidden rounded-lg border border-[var(--card-border)] bg-black/5">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={current.imageUrl} alt={current.caption ?? ""} className="max-h-[70vh] w-full object-contain bg-black/5" />
+              {isVideoUrl(current.imageUrl) ? (
+                <video
+                  src={current.imageUrl}
+                  className="max-h-[70vh] w-full object-contain bg-black/5"
+                  controls
+                  playsInline
+                  preload="metadata"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={current.imageUrl} alt={current.caption ?? ""} className="max-h-[70vh] w-full object-contain bg-black/5" />
+              )}
 
               <button
                 type="button"

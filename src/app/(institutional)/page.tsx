@@ -22,6 +22,7 @@ import {
   getSiteSettings,
 } from "@/lib/site-data";
 import { PackageCard } from "@/components/site/PackageCard";
+import { isVideoUrl } from "@/lib/media-url";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings();
@@ -138,12 +139,22 @@ export default async function HomePage() {
                 className="group overflow-hidden rounded-xl border border-[var(--igh-border)] bg-white"
                 title={p.caption ?? `Ver fotos de ${p.year}`}
               >
-                <img
-                  src={p.imageUrl}
-                  alt={p.caption ?? ""}
-                  className="h-52 w-full object-cover transition-transform group-hover:scale-[1.02]"
-                  loading="lazy"
-                />
+                {isVideoUrl(p.imageUrl) ? (
+                  <video
+                    src={p.imageUrl}
+                    className="h-52 w-full object-cover bg-black/5 transition-transform group-hover:scale-[1.02]"
+                    muted
+                    playsInline
+                    preload="metadata"
+                  />
+                ) : (
+                  <img
+                    src={p.imageUrl}
+                    alt={p.caption ?? ""}
+                    className="h-52 w-full object-cover transition-transform group-hover:scale-[1.02]"
+                    loading="lazy"
+                  />
+                )}
                 <div className="flex items-center justify-between gap-3 border-t border-[var(--igh-border)] px-3 py-2">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold text-[var(--igh-secondary)]">{p.year}</div>

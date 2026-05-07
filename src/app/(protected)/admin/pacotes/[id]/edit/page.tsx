@@ -155,10 +155,32 @@ export default function EditarPacotePage() {
 
   return (
     <div className="mx-auto max-w-3xl py-6">
-      <Link href="/admin/pacotes" className="text-sm text-[var(--igh-primary)] hover:underline">
-        ← Pacotes
-      </Link>
-      <h1 className="mt-4 text-2xl font-semibold text-[var(--text-primary)]">Editar pacote</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <Link href="/admin/pacotes" className="text-sm text-[var(--igh-primary)] hover:underline">
+            ← Pacotes
+          </Link>
+          <h1 className="mt-4 text-2xl font-semibold text-[var(--text-primary)]">Editar pacote</h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => window.open(`/api/admin/packages/${encodeURIComponent(id)}/vouchers/export?onlyNotExported=1`, "_blank")}
+            title="Exporta somente vouchers ainda não exportados"
+          >
+            Exportar PDF (novos)
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => window.open(`/api/admin/packages/${encodeURIComponent(id)}/vouchers/export`, "_blank")}
+            title="Exporta todos os vouchers do pacote"
+          >
+            Exportar PDF (todos)
+          </Button>
+        </div>
+      </div>
       <form onSubmit={save} className="mt-6 space-y-4">
         <div>
           <label className="text-sm font-medium text-[var(--text-primary)]">Nome</label>

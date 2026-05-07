@@ -142,11 +142,16 @@ model ReservationVoucher {
   hasBreakfastKit Boolean @default(false)
   createdAt     DateTime @default(now())
   usedAt        DateTime?
+  /** Data/hora em que este voucher entrou em uma exportação (PDF). */
+  exportedAt    DateTime?
+  /** Usuário (admin/master) que realizou a exportação. */
+  exportedByUserId String?
   reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
 
   @@index([reservationId])
   @@index([packageId])
   @@index([code])
+  @@index([exportedAt])
   @@unique([reservationId, personType, personIndex])
   @@unique([packageId, codeNumber])
 }

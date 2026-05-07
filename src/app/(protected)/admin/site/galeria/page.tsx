@@ -6,6 +6,7 @@ import { useToast } from "@/components/feedback/ToastProvider";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import type { ApiResponse } from "@/lib/api-types";
+import { isVideoUrl } from "@/lib/media-url";
 
 type YearRow = {
   id: string;
@@ -243,7 +244,7 @@ export default function AdminSiteGaleriaPage() {
               <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--card-border)] bg-[var(--igh-surface)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/*"
                   multiple
                   className="hidden"
                   disabled={!selectedYearId || uploading}
@@ -264,13 +265,17 @@ export default function AdminSiteGaleriaPage() {
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {photos.map((p) => (
                 <div key={p.id} className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.imageUrl} alt={p.caption ?? ""} className="h-44 w-full object-cover" />
+                  {isVideoUrl(p.imageUrl) ? (
+                    <video src={p.imageUrl} className="h-44 w-full object-cover bg-black/5" muted playsInline preload="metadata" />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.imageUrl} alt={p.caption ?? ""} className="h-44 w-full object-cover" />
+                  )}
                   <div className="flex items-center justify-between gap-2 p-3">
                     <div className="min-w-0">
                       <div className="truncate text-xs text-[var(--text-muted)]">{p.caption ?? "—"}</div>
                       <a href={p.imageUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 underline">
-                        Abrir imagem
+                        Abrir mídia
                       </a>
                     </div>
                     <Button type="button" variant="danger" size="sm" onClick={() => void deletePhoto(p.id)}>

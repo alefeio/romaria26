@@ -8,6 +8,7 @@ import { getSessionUserFromCookie } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolvePublicAppUrl } from "@/lib/email";
 import { BRAZIL_TIMEZONE } from "@/lib/datetime-brazil";
+import { Button } from "@/components/ui/Button";
 
 type Props = { params: Promise<{ code: string }> };
 
@@ -83,6 +84,8 @@ export default async function ClienteVoucherPage({ params }: Props) {
 
   const base = await resolvePublicAppUrl();
   const checkinUrl = `${base}/admin/vouchers/${encodeURIComponent(v.code)}/checkin`;
+  const viewUrl = `${base}/voucher/${encodeURIComponent(v.code)}`;
+  const whatsappShareHref = `https://wa.me/?text=${encodeURIComponent(`Meu voucher: ${viewUrl}`)}`;
   const canValidate = v.reservation.paymentStatus === "PAID";
   const qrDataUrl = v.usedAt || !canValidate ? null : await QRCode.toDataURL(checkinUrl, { margin: 1, scale: 8 });
   const label = v.personType === "ADULT" ? `Adulto #${v.personIndex + 1}` : `Criança #${v.personIndex + 1}`;
@@ -146,6 +149,13 @@ export default async function ClienteVoucherPage({ params }: Props) {
           </div>
           <div className="mt-1 text-xs text-[var(--text-muted)]">
             Pagamento da reserva: <span className="font-medium">{v.reservation.paymentStatus}</span>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <a href={whatsappShareHref} target="_blank" rel="noopener noreferrer">
+              <Button type="button" variant="secondary" size="sm">
+                Compartilhar no WhatsApp
+              </Button>
+            </a>
           </div>
           {canValidate && !v.usedAt ? (
             <div className="mt-4 text-xs text-[var(--text-muted)] break-all">{checkinUrl}</div>

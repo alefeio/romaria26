@@ -43,14 +43,18 @@ export default function AdminReservasPage() {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<Row[]>([]);
   const [filter, setFilter] = useState("");
+  const [q, setQ] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const q = filter ? `?status=${encodeURIComponent(filter)}` : "";
-      const res = await fetch(`/api/admin/reservations${q}`);
+      const qs = new URLSearchParams();
+      if (filter) qs.set("status", filter);
+      if (q.trim()) qs.set("q", q.trim());
+      const query = qs.toString();
+      const res = await fetch(`/api/admin/reservations${query ? `?${query}` : ""}`);
       const json = (await res.json()) as ApiResponse<{ items: Row[] }>;
       if (!res.ok || !json.ok) {
         toast.push("error", !json.ok ? json.error.message : "Falha ao carregar.");
@@ -60,7 +64,7 @@ export default function AdminReservasPage() {
     } finally {
       setLoading(false);
     }
-  }, [filter, toast]);
+  }, [filter, q, toast]);
 
   useEffect(() => {
     void load();
@@ -152,6 +156,17 @@ export default function AdminReservasPage() {
         >
           Canceladas
         </Button>
+      </div>
+
+      <div className="mt-3 max-w-md">
+        <label className="text-sm font-medium text-[var(--text-primary)]">Filtrar por nome</label>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Digite o nome do cliente…"
+          className="mt-1 w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm"
+        />
+        <div className="mt-1 text-xs text-[var(--text-muted)]">Dica: também aceita e-mail e WhatsApp.</div>
       </div>
 
       {loading ? (

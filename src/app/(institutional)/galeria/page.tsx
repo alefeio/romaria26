@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader, Section, Card, Button } from "@/components/site";
 import { getGalleryYearsForSite, getSiteSettings } from "@/lib/site-data";
+import { isVideoUrl } from "@/lib/media-url";
 
 export async function generateMetadata(): Promise<Metadata> {
   const s = await getSiteSettings();
@@ -24,7 +25,17 @@ export default async function GaleriaPage() {
             {years.map((y) => (
               <Card key={y.id} as="article" className="flex flex-col overflow-hidden">
                 {y.coverImageUrl ? (
-                  <img src={y.coverImageUrl} alt="" className="mb-3 h-44 w-full rounded-lg object-cover" />
+                  isVideoUrl(y.coverImageUrl) ? (
+                    <video
+                      src={y.coverImageUrl}
+                      className="mb-3 h-44 w-full rounded-lg object-cover bg-black/5"
+                      muted
+                      playsInline
+                      preload="metadata"
+                    />
+                  ) : (
+                    <img src={y.coverImageUrl} alt="" className="mb-3 h-44 w-full rounded-lg object-cover" />
+                  )
                 ) : (
                   <div className="mb-3 h-44 w-full rounded-lg border border-[var(--card-border)] bg-[var(--igh-surface)]" />
                 )}
