@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Modal } from "@/components/ui/Modal";
+import { GalleryMediaThumb } from "@/components/site/GalleryMediaThumb";
 import { isVideoUrl } from "@/lib/media-url";
 
 type Photo = { id: string; imageUrl: string; caption: string | null };
@@ -54,7 +55,7 @@ export function GalleryYearLightbox({
   }, [next, open, prev]);
 
   if (safePhotos.length === 0) {
-    return <p className="text-center text-[var(--igh-muted)]">Nenhuma foto cadastrada para este ano.</p>;
+    return <p className="text-center text-[var(--igh-muted)]">Nenhuma foto ou vídeo cadastrado para este ano.</p>;
   }
 
   return (
@@ -68,23 +69,12 @@ export function GalleryYearLightbox({
             className="group overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] text-left focus:outline-none focus:ring-2 focus:ring-[var(--igh-primary)]"
             title={p.caption ?? ""}
           >
-            {isVideoUrl(p.imageUrl) ? (
-              <video
-                src={p.imageUrl}
-                className="h-56 w-full object-cover bg-black/5 transition-transform group-hover:scale-[1.02]"
-                muted
-                playsInline
-                preload="metadata"
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={p.imageUrl}
-                alt={p.caption ?? ""}
-                className="h-56 w-full object-cover transition-transform group-hover:scale-[1.02]"
-                loading="lazy"
-              />
-            )}
+            <GalleryMediaThumb
+              src={p.imageUrl}
+              alt={p.caption ?? ""}
+              className="transition-transform group-hover:scale-[1.02]"
+              mediaClassName="h-56"
+            />
             {p.caption ? (
               <div className="border-t border-[var(--card-border)] p-3 text-xs text-[var(--text-secondary)]">{p.caption}</div>
             ) : null}
@@ -137,7 +127,7 @@ export function GalleryYearLightbox({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="text-xs text-[var(--text-muted)]">Dica: use as setas do teclado (← →) para navegar.</div>
               <a href={current.imageUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">
-                Abrir imagem em nova aba
+                Abrir arquivo em nova aba
               </a>
             </div>
           </div>

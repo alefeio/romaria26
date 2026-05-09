@@ -9,6 +9,7 @@ import {
   FAQ,
   BlogCard,
   HeroBannerCarousel,
+  GalleryMediaThumb,
 } from "@/components/site";
 import { awardsShowcase } from "@/content";
 import {
@@ -22,7 +23,6 @@ import {
   getSiteSettings,
 } from "@/lib/site-data";
 import { PackageCard } from "@/components/site/PackageCard";
-import { isVideoUrl } from "@/lib/media-url";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings();
@@ -130,31 +130,21 @@ export default async function HomePage() {
       ) : null}
 
       {latestGalleryPhotos.length > 0 ? (
-        <Section title="Galeria" subtitle="As últimas fotos publicadas.">
+        <Section title="Galeria" subtitle="As últimas fotos e vídeos publicados.">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {latestGalleryPhotos.map((p) => (
               <a
                 key={p.id}
                 href={`/galeria/${p.year}`}
                 className="group overflow-hidden rounded-xl border border-[var(--igh-border)] bg-white"
-                title={p.caption ?? `Ver fotos de ${p.year}`}
+                title={p.caption ?? `Ver galeria de ${p.year}`}
               >
-                {isVideoUrl(p.imageUrl) ? (
-                  <video
-                    src={p.imageUrl}
-                    className="h-52 w-full object-cover bg-black/5 transition-transform group-hover:scale-[1.02]"
-                    muted
-                    playsInline
-                    preload="metadata"
-                  />
-                ) : (
-                  <img
-                    src={p.imageUrl}
-                    alt={p.caption ?? ""}
-                    className="h-52 w-full object-cover transition-transform group-hover:scale-[1.02]"
-                    loading="lazy"
-                  />
-                )}
+                <GalleryMediaThumb
+                  src={p.imageUrl}
+                  alt={p.caption ?? ""}
+                  className="transition-transform group-hover:scale-[1.02]"
+                  mediaClassName="h-52"
+                />
                 <div className="flex items-center justify-between gap-3 border-t border-[var(--igh-border)] px-3 py-2">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold text-[var(--igh-secondary)]">{p.year}</div>

@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: { params: Promise<{ ano: stri
   const s = await getSiteSettings();
   const name = s?.siteName?.trim() || "Site";
   const title = Number.isFinite(yearNum) ? `Galeria ${yearNum} | ${name}` : `Galeria | ${name}`;
-  const description = s?.seoDescriptionDefault?.trim() || `Fotos da galeria de ${name}.`;
+  const description = s?.seoDescriptionDefault?.trim() || `Fotos e vídeos da galeria de ${name}.`;
   return { title, description, openGraph: { title, description } };
 }
 
@@ -31,7 +31,7 @@ export default async function GaleriaAnoPage({ params }: { params: Promise<{ ano
 
   return (
     <>
-      <PageHeader title={`Galeria ${data.year}`} subtitle={data.title ?? "Fotos do ano."} />
+      <PageHeader title={`Galeria ${data.year}`} subtitle={data.title ?? "Fotos e vídeos do ano."} />
       <Section>
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <Link href="/galeria" className="text-sm text-blue-600 underline">

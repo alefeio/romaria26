@@ -6,7 +6,8 @@ import { useToast } from "@/components/feedback/ToastProvider";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import type { ApiResponse } from "@/lib/api-types";
-import { isVideoUrl } from "@/lib/media-url";
+import { GalleryMediaThumb } from "@/components/site/GalleryMediaThumb";
+import { isVideoMimeType } from "@/lib/media-url";
 
 type YearRow = {
   id: string;
@@ -24,7 +25,7 @@ type PhotoRow = {
   order: number;
 };
 
-async function uploadGalleryImage(yearId: string, file: File): Promise<string> {
+async function uploadGalleryMedia(yearId: string, file: File): Promise<string> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("kind", "gallery");
@@ -83,7 +84,7 @@ export default function AdminSiteGaleriaPage() {
         const res = await fetch(`/api/admin/site/gallery/photos?yearId=${encodeURIComponent(yearId)}`);
         const json = (await res.json()) as ApiResponse<{ items: PhotoRow[] }>;
         if (!res.ok || !json.ok) {
-          toast.push("error", !json.ok ? json.error.message : "Falha ao carregar fotos.");
+          toast.push("error", !json.ok ? json.error.message : "Falha ao carregar a galeria.");
           return;
         }
         setPhotos(json.data.items);
@@ -131,14 +132,14 @@ export default function AdminSiteGaleriaPage() {
   }
 
   async function deletePhoto(photoId: string) {
-    if (!window.confirm("Excluir esta foto da galeria?")) return;
+    if (!window.confirm("Excluir este item da galeria?")) return;
     const res = await fetch(`/api/admin/site/gallery/photos/${photoId}`, { method: "DELETE" });
     const json = (await res.json()) as ApiResponse<unknown>;
     if (!res.ok || !json.ok) {
       toast.push("error", !json.ok ? (json as any).error.message : "Falha ao excluir.");
       return;
     }
-    toast.push("success", "Foto excluída.");
+    toast.push("success", "Item excluído.");
     if (selectedYearId) void loadPhotos(selectedYearId);
     void loadYears();
   }
@@ -146,16 +147,30 @@ export default function AdminSiteGaleriaPage() {
   async function onUploadFiles(files: FileList | null) {
     if (!files?.length) return;
     if (!selectedYearId) {
-      toast.push("error", "Selecione um ano para enviar fotos.");
+      toast.push("error", "Selecione um ano para enviar arquivos.");
+      return;
+    }
+    const candidates = Array.from(files);
+    const list = candidates.filter((f) => {
+      const mimeOk =
+        f.type.startsWith("image/") ||
+        isVideoMimeType(f.type) ||
+        (!f.type && /\.(jpe?g|png|gif|webp|bmp|svg|mp4|webm|ogg|mov|m4v)(\?|$)/i.test(f.name));
+      if (!mimeOk) {
+        toast.push("error", `Tipo não suportado: ${f.name}. Use imagem ou vídeo.`);
+      }
+      return mimeOk;
+    });
+    if (!list.length) {
+      toast.push("error", "Nenhum arquivo válido para enviar.");
       return;
     }
     setUploading(true);
-    setUploadProgress({ done: 0, total: files.length });
+    setUploadProgress({ done: 0, total: list.length });
     try {
-      const list = Array.from(files);
       for (let i = 0; i < list.length; i++) {
         const f = list[i]!;
-        const url = await uploadGalleryImage(selectedYearId, f);
+        const url = await uploadGalleryMedia(selectedYearId, f);
         const res = await fetch("/api/admin/site/gallery/photos", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -163,7 +178,7 @@ export default function AdminSiteGaleriaPage() {
         });
         const json = (await res.json()) as ApiResponse<{ item: PhotoRow }>;
         if (!res.ok || !json.ok) {
-          throw new Error(!json.ok ? json.error.message : "Falha ao registrar foto no banco.");
+          throw new Error(!json.ok ? json.error.message : "Falha ao registrar no banco.");
         }
         setUploadProgress({ done: i + 1, total: list.length });
       }
@@ -180,8 +195,10 @@ export default function AdminSiteGaleriaPage() {
 
   return (
     <div className="py-6">
-      <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Galeria de fotos</h1>
-      <p className="mt-1 text-sm text-[var(--text-secondary)]">Organize as fotos por ano e envie múltiplas imagens de uma vez.</p>
+      <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Galeria de fotos e vídeos</h1>
+      <p className="mt-1 text-sm text-[var(--text-secondary)]">
+        Organize por ano. Envie várias imagens ou vídeos de uma vez (upload múltiplo).
+      </p>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
         <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5 shadow-sm">
@@ -234,10 +251,12 @@ export default function AdminSiteGaleriaPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-[var(--text-primary)]">
-                  {selectedYear ? `Fotos de ${selectedYear.year}` : "Selecione um ano"}
+                  {selectedYear ? `Mídias de ${selectedYear.year}` : "Selecione um ano"}
                 </div>
                 <div className="mt-1 text-xs text-[var(--text-muted)]">
-                  {uploadProgress ? `Enviando ${uploadProgress.done}/${uploadProgress.total}…` : "Use upload múltiplo para enviar várias fotos."}
+                  {uploadProgress
+                    ? `Enviando ${uploadProgress.done}/${uploadProgress.total}…`
+                    : "Aceita imagens e vídeos (ex.: MP4, WebM)."}
                 </div>
               </div>
 
@@ -250,27 +269,22 @@ export default function AdminSiteGaleriaPage() {
                   disabled={!selectedYearId || uploading}
                   onChange={(e) => void onUploadFiles(e.target.files)}
                 />
-                {uploading ? "Enviando…" : "Upload múltiplo"}
+                {uploading ? "Enviando…" : "Enviar fotos/vídeos"}
               </label>
             </div>
           </div>
 
           {loadingPhotos ? (
-            <p className="mt-4 text-sm text-[var(--text-secondary)]">Carregando fotos…</p>
+            <p className="mt-4 text-sm text-[var(--text-secondary)]">Carregando…</p>
           ) : !selectedYearId ? (
-            <p className="mt-4 text-sm text-[var(--text-secondary)]">Selecione um ano para ver/enviar fotos.</p>
+            <p className="mt-4 text-sm text-[var(--text-secondary)]">Selecione um ano para ver/enviar mídias.</p>
           ) : photos.length === 0 ? (
-            <p className="mt-4 text-sm text-[var(--text-secondary)]">Nenhuma foto neste ano ainda.</p>
+            <p className="mt-4 text-sm text-[var(--text-secondary)]">Nenhuma foto ou vídeo neste ano ainda.</p>
           ) : (
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {photos.map((p) => (
                 <div key={p.id} className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)]">
-                  {isVideoUrl(p.imageUrl) ? (
-                    <video src={p.imageUrl} className="h-44 w-full object-cover bg-black/5" muted playsInline preload="metadata" />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.imageUrl} alt={p.caption ?? ""} className="h-44 w-full object-cover" />
-                  )}
+                  <GalleryMediaThumb src={p.imageUrl} alt={p.caption ?? ""} mediaClassName="h-44" />
                   <div className="flex items-center justify-between gap-2 p-3">
                     <div className="min-w-0">
                       <div className="truncate text-xs text-[var(--text-muted)]">{p.caption ?? "—"}</div>

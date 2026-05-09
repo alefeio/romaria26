@@ -16,3 +16,4 @@ export { BlogCard } from "./BlogCard";
 export { NoticiasList } from "./NoticiasList";
 export { HeroBannerCarousel } from "./HeroBannerCarousel";
 export { ImageCarousel } from "./ImageCarousel";
+export { GalleryMediaThumb } from "./GalleryMediaThumb";
