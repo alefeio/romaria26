@@ -6,9 +6,16 @@ export const setupSchema = z.object({
   password: z.string().min(8, "Senha deve ter no mínimo 8 caracteres"),
 });
 
+const registerPhone = z
+  .string()
+  .min(1, "Celular é obrigatório.")
+  .transform((s) => s.replace(/\D/g, ""))
+  .refine((v) => v.length === 11, "Informe o celular com DDD (11 dígitos).");
+
 export const registerSchema = z.object({
   name: z.string().min(2, "Nome é obrigatório"),
   email: z.string().email("E-mail inválido").toLowerCase(),
+  phone: registerPhone,
   password: z.string().min(8, "Senha deve ter no mínimo 8 caracteres"),
 });
 

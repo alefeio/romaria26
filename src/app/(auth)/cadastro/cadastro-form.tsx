@@ -18,16 +18,26 @@ export function CadastroForm({ redirectTo }: CadastroFormProps) {
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+
+  function digitsOnly(s: string): string {
+    return (s ?? "").replace(/\D/g, "");
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    const phoneDigits = digitsOnly(phone);
+    if (phoneDigits.length !== 11) {
+      toast.push("error", "Informe o celular com DDD (11 dígitos).");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, phone: phoneDigits, password }),
       });
       const json = (await res.json()) as ApiResponse<{ user: { id: string } }>;
       if (!res.ok || !json.ok) {
@@ -55,6 +65,20 @@ export function CadastroForm({ redirectTo }: CadastroFormProps) {
         <div className="mt-1">
           <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@email.com" type="email" />
         </div>
+      </div>
+      <div>
+        <label className="text-sm font-medium">Celular (WhatsApp)</label>
+        <div className="mt-1">
+          <Input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="(91) 99999-9999"
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel"
+          />
+        </div>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">DDD + número, 11 dígitos no total.</p>
       </div>
       <div>
         <label className="text-sm font-medium">Senha</label>

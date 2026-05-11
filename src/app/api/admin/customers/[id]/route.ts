@@ -18,7 +18,18 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
 
   const user = await prisma.user.findUnique({
     where: { id },
-    select: { id: true, name: true, email: true, phone: true, cpf: true, isActive: true, role: true, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      cpf: true,
+      isActive: true,
+      role: true,
+      mustChangePassword: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   });
   if (!user || user.role !== "CUSTOMER") return jsonErr("NOT_FOUND", "Cliente não encontrado.", 404);
 
@@ -45,6 +56,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
     item: {
       ...user,
       createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
       paymentSummary: {
         totalDue: (agg._sum.totalDue ?? new Prisma.Decimal(0)).toString(),
         totalPaid: (agg._sum.totalPaid ?? new Prisma.Decimal(0)).toString(),

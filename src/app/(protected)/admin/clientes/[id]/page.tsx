@@ -34,7 +34,10 @@ type CustomerDetail = {
   phone: string | null;
   cpf: string | null;
   isActive: boolean;
+  role: string;
+  mustChangePassword: boolean;
   createdAt: string;
+  updatedAt: string;
   paymentSummary?: {
     totalDue: string;
     totalPaid: string;
@@ -138,8 +141,43 @@ export default function AdminClienteDetailPage() {
               {isCustomerPlaceholderEmail(item.email) ? (
                 <p className="mt-1 text-xs text-[var(--text-muted)]">E-mail ainda não informado (cadastro interno).</p>
               ) : null}
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">{item.phone ?? "-"}</p>
-              {item.cpf ? <p className="mt-1 text-sm text-[var(--text-secondary)]">CPF: {item.cpf}</p> : null}
+              <div className="mt-4 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 text-sm">
+                <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Dados do cadastro</div>
+                <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs text-[var(--text-muted)]">ID</dt>
+                    <dd className="font-mono text-xs text-[var(--text-primary)] break-all">{item.id}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-[var(--text-muted)]">Perfil</dt>
+                    <dd className="text-[var(--text-primary)]">{item.role === "CUSTOMER" ? "Cliente" : item.role}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-[var(--text-muted)]">Celular</dt>
+                    <dd className="text-[var(--text-primary)]">{item.phone ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-[var(--text-muted)]">CPF</dt>
+                    <dd className="text-[var(--text-primary)]">{item.cpf ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-[var(--text-muted)]">Conta ativa</dt>
+                    <dd className="text-[var(--text-primary)]">{item.isActive ? "Sim" : "Não"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-[var(--text-muted)]">Trocar senha no próximo login</dt>
+                    <dd className="text-[var(--text-primary)]">{item.mustChangePassword ? "Sim" : "Não"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-[var(--text-muted)]">Data de cadastro</dt>
+                    <dd className="text-[var(--text-primary)]">{new Date(item.createdAt).toLocaleString("pt-BR")}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-[var(--text-muted)]">Última atualização</dt>
+                    <dd className="text-[var(--text-primary)]">{new Date(item.updatedAt).toLocaleString("pt-BR")}</dd>
+                  </div>
+                </dl>
+              </div>
             </div>
             <div className="flex flex-col items-end gap-2">
               <Badge tone="zinc">{stage}</Badge>

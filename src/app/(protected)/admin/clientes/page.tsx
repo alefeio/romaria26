@@ -128,7 +128,9 @@ export default function AdminClientesPage() {
             <thead>
               <tr>
                 <Th>Cliente</Th>
-                <Th>Contato</Th>
+                <Th>Celular</Th>
+                <Th>CPF</Th>
+                <Th>Cadastro</Th>
                 <Th>Etapa</Th>
                 <Th className="text-right">Reservas</Th>
                 <Th className="text-right">Pendências</Th>
@@ -142,9 +144,10 @@ export default function AdminClientesPage() {
                     <div className="font-medium">{c.name}</div>
                     <div className="text-xs text-[var(--text-muted)]">{displayCustomerEmail(c.email)}</div>
                   </Td>
-                  <Td>
-                    <div className="text-xs text-[var(--text-muted)]">{c.phone ?? "-"}</div>
-                    <div className="text-xs text-[var(--text-muted)]">{c.cpf ? `CPF: ${c.cpf}` : ""}</div>
+                  <Td className="whitespace-nowrap text-sm">{c.phone ?? "—"}</Td>
+                  <Td className="text-sm text-[var(--text-muted)]">{c.cpf ?? "—"}</Td>
+                  <Td className="whitespace-nowrap text-xs text-[var(--text-muted)]">
+                    {new Date(c.createdAt).toLocaleString("pt-BR")}
                   </Td>
                   <Td>
                     <Badge tone={toneForStage(c.stage)}>{labelForStage(c.stage)}</Badge>
@@ -162,7 +165,7 @@ export default function AdminClientesPage() {
               ))}
               {visible.length === 0 ? (
                 <tr>
-                  <Td colSpan={6} className="py-10 text-center text-[var(--text-muted)]">
+                  <Td colSpan={8} className="py-10 text-center text-[var(--text-muted)]">
                     Nenhum cliente encontrado.
                   </Td>
                 </tr>

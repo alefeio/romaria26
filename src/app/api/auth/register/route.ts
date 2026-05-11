@@ -15,6 +15,7 @@ export async function POST(request: Request) {
 
     const name = parsed.data.name.trim();
     const email = parsed.data.email.trim().toLowerCase();
+    const phone = parsed.data.phone;
     const passwordHash = await hashPassword(parsed.data.password);
 
     const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
       data: {
         name,
         email,
+        phone,
         passwordHash,
         role: "CUSTOMER",
         isActive: true,
