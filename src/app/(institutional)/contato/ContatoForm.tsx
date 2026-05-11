@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Card, Button } from "@/components/site";
+import { formatBrazilMobileDisplay } from "@/lib/format-brazil-mobile";
 
 function capitalizeEachWord(value: string): string {
   return value
@@ -9,13 +10,6 @@ function capitalizeEachWord(value: string): string {
     .split(/\s+/)
     .map((word) => (word.length > 0 ? word[0].toUpperCase() + word.slice(1).toLowerCase() : ""))
     .join(" ");
-}
-
-function formatPhoneDisplay(digits: string): string {
-  const d = digits.replace(/\D/g, "").slice(0, 11);
-  if (d.length <= 2) return d.length ? `(${d}` : "";
-  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
-  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
 function phoneDigitsOnly(value: string): string {
@@ -82,7 +76,7 @@ export function ContatoForm() {
 
   function handleTelefoneChange(e: React.ChangeEvent<HTMLInputElement>) {
     const digits = e.target.value.replace(/\D/g, "").slice(0, 11);
-    setTelefoneDisplay(formatPhoneDisplay(digits));
+    setTelefoneDisplay(formatBrazilMobileDisplay(digits));
   }
 
   return (
