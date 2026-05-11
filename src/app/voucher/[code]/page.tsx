@@ -8,8 +8,9 @@ import { prisma } from "@/lib/prisma";
 import { BRAZIL_TIMEZONE } from "@/lib/datetime-brazil";
 import { getSessionUserFromCookie } from "@/lib/auth";
 import { resolvePublicAppUrl } from "@/lib/email";
+import { verifyPassword } from "@/lib/auth";
 
-type Props = { params: Promise<{ code: string }> };
+type Props = { params: Promise<{ code: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 function formatWhen(d: Date, time: string): string {
   const date = new Intl.DateTimeFormat("pt-BR", {
@@ -21,12 +22,15 @@ function formatWhen(d: Date, time: string): string {
   return `${date} às ${time}`;
 }
 
-export default async function VoucherPage({ params }: Props) {
+export default async function VoucherPage({ params, searchParams }: Props) {
   const { code } = await params;
   const c = decodeURIComponent(code ?? "").trim();
   if (!c) notFound();
 
   const session = await getSessionUserFromCookie();
+  const sp = await searchParams;
+  const sharedId = typeof sp.s === "string" ? sp.s.trim() : "";
+  const sharedPass = typeof sp.p === "string" ? sp.p.trim() : "";
   const v = await prisma.reservationVoucher.findFirst({
     where: { code: c },
     include: {
@@ -41,6 +45,31 @@ export default async function VoucherPage({ params }: Props) {
     },
   });
   if (!v) notFound();
+
+  // Acesso por compartilhamento (senha temporária) — válido para qualquer pessoa.
+  if (!session && sharedId && sharedPass) {
+    const share = await prisma.reservationVoucherShare.findFirst({
+      where: { id: sharedId, voucherId: v.id },
+      select: { passwordHash: true, expiresAt: true },
+    });
+    const ok =
+      share && share.expiresAt.getTime() > Date.now()
+        ? await verifyPassword(sharedPass, share.passwordHash)
+        : false;
+    if (!ok) {
+      return (
+        <main className="mx-auto max-w-xl px-4 py-10">
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
+            <div className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-100">Acesso por compartilhamento</div>
+            <h1 className="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-100">Senha inválida ou expirada</h1>
+            <p className="mt-2 text-sm text-amber-800/90 dark:text-amber-200/90">
+              Peça para o responsável compartilhar novamente o voucher para gerar uma nova senha temporária.
+            </p>
+          </div>
+        </main>
+      );
+    }
+  }
 
   // Clientes só podem ver o próprio voucher (para não expor dados pessoais).
   if (session?.role === "CUSTOMER" && v.reservation.userId !== session.id) {

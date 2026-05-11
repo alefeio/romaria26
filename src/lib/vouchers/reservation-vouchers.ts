@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { isCustomerPlaceholderEmail } from "@/lib/customer-placeholder-email";
 import { resolvePublicAppUrl } from "@/lib/email";
 import { sendEmailAndRecord } from "@/lib/email/send-and-record";
+import { getEmailBranding, wrapBrandedEmail } from "@/lib/email/branding";
 
 export const VOUCHER_RANGES = {
   ADULT_WITH_KIT: { from: 1, to: 1000 },
@@ -231,6 +232,8 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
       .join("")}
   </div>
   `;
+  const branding = await getEmailBranding();
+  const htmlBranded = wrapBrandedEmail({ logoUrl: branding.logoUrl, siteName: branding.siteName, bodyHtml: html });
 
   await Promise.allSettled([
     alreadyCustomer
@@ -238,7 +241,7 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
       : sendEmailAndRecord({
           to: customerEmail,
           subject,
-          html,
+          html: htmlBranded,
           emailType: "RESERVATION_VOUCHERS_CUSTOMER",
           entityType: "Reservation",
           entityId: reservationId,
@@ -249,7 +252,7 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
       : sendEmailAndRecord({
           to: adminTo,
           subject: `[ADMIN] ${subject}`,
-          html,
+          html: htmlBranded,
           emailType: "RESERVATION_VOUCHERS_ADMIN",
           entityType: "Reservation",
           entityId: reservationId,

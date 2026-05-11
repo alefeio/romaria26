@@ -146,6 +146,7 @@ model ReservationVoucher {
   exportedAt    DateTime?
   /** Usuário (admin/master) que realizou a exportação. */
   exportedByUserId String?
+  shares        ReservationVoucherShare[]
   reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
 
   @@index([reservationId])
@@ -154,6 +155,20 @@ model ReservationVoucher {
   @@index([exportedAt])
   @@unique([reservationId, personType, personIndex])
   @@unique([packageId, codeNumber])
+}
+
+model ReservationVoucherShare {
+  id          String   @id @default(uuid())
+  voucherId   String
+  passwordHash String
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+  createdByUserId String?
+
+  voucher     ReservationVoucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  @@index([voucherId, createdAt])
+  @@index([expiresAt])
 }
 
 enum VoucherPersonType {

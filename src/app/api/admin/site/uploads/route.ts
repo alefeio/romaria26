@@ -59,11 +59,28 @@ export async function POST(request: Request) {
     folder = getSiteUploadFolder(kind);
   }
 
+  const isVideo = file.type.startsWith("video/");
+  const videoSub = process.env.APIMG_GALLERY_VIDEO_SUBFOLDER?.trim();
+  if (kind === "gallery" && isVideo && videoSub) {
+    folder = `${folder}/${videoSub}`.replace(/\/+/g, "/");
+  }
+
+  const uploadUrlVideo = process.env.APIMG_UPLOAD_URL_VIDEO?.trim();
+  const uploadUrl =
+    kind === "gallery" && isVideo && uploadUrlVideo ? uploadUrlVideo : undefined;
+
   try {
-    const { url, publicId } = await uploadFileToApimg(file, file.name || "upload", { folder });
+    const { url, publicId } = await uploadFileToApimg(file, file.name || "upload", {
+      folder,
+      uploadUrl,
+    });
     return jsonOk({ url, publicId });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Falha no upload.";
+    let message = e instanceof Error ? e.message : "Falha no upload.";
+    if (/tipo não suportado|allowed_mime|mime/i.test(message)) {
+      message +=
+        " No serviço APIMG, inclua tipos video/* (ex.: video/mp4) em allowed_mime para este upload, ou defina APIMG_UPLOAD_URL_VIDEO no .env apontando para um endpoint que aceite vídeos. Opcional: APIMG_GALLERY_VIDEO_SUBFOLDER=video para usar subpasta com regras diferentes.";
+    }
     return jsonErr("UPLOAD_ERROR", message, 502);
   }
 }

@@ -8,7 +8,7 @@ import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolvePublicAppUrl } from "@/lib/email";
 import { AdminSendVoucherButton } from "./send-voucher-button";
-import { Button } from "@/components/ui/Button";
+import { ShareVoucherWhatsAppButton } from "@/app/(protected)/share-voucher-whatsapp-button";
 
 type Props = { params: Promise<{ code: string }> };
 
@@ -21,6 +21,8 @@ export default async function AdminVoucherDetailPage({ params }: Props) {
   const v = await prisma.reservationVoucher.findFirst({
     where: { code: c },
     include: {
+      shares: { select: { createdAt: true }, orderBy: { createdAt: "desc" }, take: 1 },
+      _count: { select: { shares: true } },
       reservation: {
         select: {
           id: true,
@@ -36,10 +38,10 @@ export default async function AdminVoucherDetailPage({ params }: Props) {
 
   const base = await resolvePublicAppUrl();
   const checkinUrl = `${base}/voucher/${encodeURIComponent(v.code)}`;
-  const viewUrl = `${base}/voucher/${encodeURIComponent(v.code)}`;
-  const whatsappShareHref = `https://wa.me/?text=${encodeURIComponent(`Voucher: ${viewUrl}`)}`;
   const qrDataUrl = await QRCode.toDataURL(checkinUrl, { margin: 1, scale: 8 });
   const label = v.personType === "ADULT" ? `Adulto #${v.personIndex + 1}` : `Criança #${v.personIndex + 1}`;
+  const shareCount = v._count?.shares ?? 0;
+  const lastSharedAt = v.shares?.[0]?.createdAt ?? null;
 
   return (
     <div className="py-6">
@@ -48,11 +50,7 @@ export default async function AdminVoucherDetailPage({ params }: Props) {
           ← Voltar para reserva
         </Link>
         <div className="flex flex-wrap items-center gap-2">
-          <a href={whatsappShareHref} target="_blank" rel="noopener noreferrer">
-            <Button type="button" variant="secondary" size="sm">
-              Compartilhar no WhatsApp
-            </Button>
-          </a>
+          <ShareVoucherWhatsAppButton code={v.code} intro={`Voucher ${v.code} • ${v.reservation.package.name}`} />
           <AdminSendVoucherButton code={v.code} />
         </div>
       </div>
@@ -86,6 +84,12 @@ export default async function AdminVoucherDetailPage({ params }: Props) {
           <div className="mt-2 text-xs text-[var(--text-muted)]">
             Pagamento da reserva: <span className="font-medium">{v.reservation.paymentStatus}</span>
           </div>
+          {shareCount > 0 ? (
+            <div className="mt-2 text-xs text-[var(--text-muted)]">
+              Compartilhado: <span className="font-medium">{shareCount} vez(es)</span>
+              {lastSharedAt ? ` · último em ${new Date(lastSharedAt).toLocaleString("pt-BR")}` : ""}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

@@ -6,6 +6,9 @@ import { jsonErr, jsonOk } from "@/lib/http";
 import { createAuditLog } from "@/lib/audit";
 import { isCustomerPlaceholderEmail } from "@/lib/customer-placeholder-email";
 import { sendEmailAndRecord } from "@/lib/email/send-and-record";
+import { getEmailBranding, wrapBrandedEmail } from "@/lib/email/branding";
+import { generateTempPassword } from "@/lib/password";
+import { hashPassword } from "@/lib/auth";
 import {
   createReservationInTransaction,
   ReservationCreateError,
@@ -17,6 +20,15 @@ function buildWhatsAppHref(contactWhatsapp: string | null | undefined, text: str
   if (digits.length < 10) return null;
   const withCountry = digits.startsWith("55") ? digits : "55" + digits;
   return `https://wa.me/${withCountry}?text=${encodeURIComponent(text)}`;
+}
+
+function escapeHtml(s: string): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 export async function GET(request: Request) {
@@ -183,14 +195,58 @@ export async function POST(request: Request) {
     const whatsappUrl = buildWhatsAppHref(settings?.contactWhatsapp, summaryText);
 
     const subject = `Reserva (painel) — ${pkg?.name ?? "Passeio"} (${reservation.quantity} pessoa(s))`;
-    const html = `<pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; white-space: pre-wrap; line-height: 1.4">${summaryText.replace(
-      /</g,
-      "&lt;"
-    )}</pre>`;
+    const branding = await getEmailBranding();
+    const loginUrl = branding.loginUrl;
+    const resetUrl = branding.resetPasswordUrl;
 
-    const adminTo = adminUsers.map((u) => u.email).filter(Boolean);
+    // Não é possível recuperar a senha atual. Para informar "senha" no e-mail,
+    // geramos uma senha temporária e forçamos troca no primeiro acesso.
+    // (somente se realmente vamos enviar e-mail ao cliente).
     const customerEmail = reservation.customerEmailSnapshot.trim();
     const sendToCustomer = customerEmail.length > 0 && !isCustomerPlaceholderEmail(customerEmail);
+    const tempPassword = sendToCustomer ? generateTempPassword() : null;
+    if (tempPassword) {
+      const passwordHash = await hashPassword(tempPassword);
+      await prisma.user.update({
+        where: { id: target.id },
+        data: { passwordHash, mustChangePassword: true },
+      });
+    }
+
+    const pre = summaryText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const accessBlock = `
+      <div style="margin: 14px 0 0; padding: 14px; border:1px solid #e5e7eb; border-radius: 12px; background:#f9fafb;">
+        <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">Acesso à área do cliente</div>
+        <div style="font-size: 13px; color:#111827;">
+          <div><strong>Link:</strong> <a href="${loginUrl}">${loginUrl}</a></div>
+          <div><strong>E-mail:</strong> ${escapeHtml(target.email)}</div>
+          ${
+            tempPassword
+              ? `<div><strong>Senha temporária:</strong> <code style="background:#fff; padding:2px 6px; border:1px solid #e5e7eb; border-radius:6px;">${escapeHtml(
+                  tempPassword
+                )}</code></div>
+                 <div style="margin-top:6px; font-size: 12px; color:#6b7280;">Por segurança, você deverá trocar a senha no primeiro acesso.</div>`
+              : `<div style="margin-top:6px; font-size: 12px; color:#6b7280;">Se você não lembrar sua senha, use: <a href="${resetUrl}">${resetUrl}</a></div>`
+          }
+        </div>
+      </div>
+    `;
+
+    const html = wrapBrandedEmail({
+      logoUrl: branding.logoUrl,
+      siteName: branding.siteName,
+      bodyHtml: `
+        <h2 style="margin:0 0 6px; font-size: 18px;">Reserva recebida</h2>
+        <p style="margin:0 0 14px; color:#374151; font-size: 14px;">Recebemos sua reserva. Confira os detalhes abaixo.</p>
+        ${accessBlock}
+        <div style="margin-top: 16px;">
+          <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color:#6b7280; margin-bottom: 8px;">Detalhes da reserva</div>
+          <pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; white-space: pre-wrap; line-height: 1.45; background:#fff; border:1px solid #e5e7eb; border-radius: 12px; padding: 12px; margin:0;">${pre}</pre>
+        </div>
+      `,
+    });
+
+    const adminTo = adminUsers.map((u) => u.email).filter(Boolean);
 
     await Promise.allSettled([
       sendToCustomer
