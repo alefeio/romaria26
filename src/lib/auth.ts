@@ -21,7 +21,7 @@ export function getAuthCookieOptions() {
   };
 }
 
-export type SessionUser = Pick<User, "id" | "name" | "email" | "role" | "isActive" | "mustChangePassword"> & {
+export type SessionUser = Pick<User, "id" | "name" | "email" | "phone" | "role" | "isActive" | "mustChangePassword"> & {
   isAdmin?: boolean;
   baseRole?: UserRole;
 };
@@ -89,6 +89,7 @@ export async function getSessionUserFromCookie(): Promise<SessionUser | null> {
         id: true,
         name: true,
         email: true,
+        phone: true,
         role: true,
         isAdmin: true,
         isActive: true,
@@ -104,6 +105,7 @@ export async function getSessionUserFromCookie(): Promise<SessionUser | null> {
       id: user.id,
       name: user.name,
       email: user.email,
+      phone: user.phone,
       role: payload.role as UserRole,
       baseRole: user.role,
       isActive: user.isActive,

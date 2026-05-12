@@ -99,7 +99,7 @@ export default async function PasseioDetalhePage({ params }: Props) {
             kitsDeliveryInfo={pkg.kitsDeliveryInfo}
             defaultName={session?.name ?? ""}
             defaultEmail={session?.email ?? ""}
-            defaultPhone=""
+            defaultPhone={session?.phone ?? ""}
           />
         </div>
       </div>

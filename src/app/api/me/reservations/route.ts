@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { getSessionUserFromCookie, hashPassword } from "@/lib/auth";
+import { getSessionUserFromCookie } from "@/lib/auth";
 import { jsonErr, jsonOk } from "@/lib/http";
 import {
   createReservationInTransaction,
@@ -9,7 +9,6 @@ import {
 } from "@/lib/reservations/create-reservation";
 import { sendEmailAndRecord } from "@/lib/email/send-and-record";
 import { getEmailBranding, wrapBrandedEmail } from "@/lib/email/branding";
-import { generateTempPassword } from "@/lib/password";
 
 function escapeHtml(s: string): string {
   return String(s ?? "")
@@ -233,26 +232,14 @@ export async function POST(request: Request) {
     const loginUrl = branding.loginUrl;
     const resetUrl = branding.resetPasswordUrl;
 
-    // Não é possível recuperar a senha atual. Para informar "senha" no e-mail,
-    // geramos uma senha temporária e forçamos troca no primeiro acesso.
-    const tempPassword = generateTempPassword();
-    const passwordHash = await hashPassword(tempPassword);
-    await prisma.user.update({
-      where: { id: session.id },
-      data: { passwordHash, mustChangePassword: true },
-    });
-
     const pre = summaryText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const accessBlock = `
       <div style="margin: 14px 0 0; padding: 14px; border:1px solid #e5e7eb; border-radius: 12px; background:#f9fafb;">
-        <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">Acesso à sua área do cliente</div>
+        <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">Acompanhar sua reserva</div>
         <div style="font-size: 13px; color:#111827;">
-          <div><strong>Link:</strong> <a href="${loginUrl}">${loginUrl}</a></div>
-          <div><strong>E-mail:</strong> ${escapeHtml(reservation.customerEmailSnapshot)}</div>
-          <div><strong>Senha temporária:</strong> <code style="background:#fff; padding:2px 6px; border:1px solid #e5e7eb; border-radius:6px;">${escapeHtml(
-            tempPassword
-          )}</code></div>
-          <div style="margin-top:6px; font-size: 12px; color:#6b7280;">Por segurança, você deverá trocar a senha no primeiro acesso.</div>
+          <div><strong>Área do cliente:</strong> <a href="${loginUrl}">${loginUrl}</a></div>
+          <div><strong>E-mail de acesso:</strong> ${escapeHtml(reservation.customerEmailSnapshot)}</div>
+          <div style="margin-top:8px; font-size: 12px; color:#6b7280;">Entre com o <strong>mesmo e-mail e senha</strong> que você usou no cadastro. Se esquecer a senha, redefina em: <a href="${resetUrl}">${resetUrl}</a></div>
         </div>
       </div>
     `;

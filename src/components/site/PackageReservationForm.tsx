@@ -52,6 +52,10 @@ export function PackageReservationForm({
     return (s ?? "").replace(/\D/g, "").slice(0, 11);
   }
 
+  const profilePhoneDigits = useMemo(() => digitsOnly(defaultPhone), [defaultPhone]);
+  /** Cliente logado com celular já cadastrado: não pedir de novo no formulário de reserva. */
+  const useProfilePhone = loggedIn && !isAdminForCustomer && profilePhoneDigits.length === 11;
+
   function formatBrPhone(value: string): string {
     const d = digitsOnly(value);
     if (d.length <= 2) return d;
@@ -78,6 +82,12 @@ export function PackageReservationForm({
   const maxQty = remainingPlaces !== null && remainingPlaces > 0 ? remainingPlaces : 1;
   const canBook = (isAdminForCustomer || loggedIn) && remainingPlaces !== null && remainingPlaces > 0;
   const quantity = Math.max(0, adultsCount) + Math.max(0, childrenCount);
+
+  useEffect(() => {
+    if (useProfilePhone) {
+      setCustomerPhoneSnapshot(profilePhoneDigits);
+    }
+  }, [useProfilePhone, profilePhoneDigits]);
 
   const shirtCount = Math.min(maxQty, Math.max(1, quantity));
   useEffect(() => {
@@ -166,7 +176,8 @@ export function PackageReservationForm({
         return;
       }
     }
-    if (digitsOnly(customerPhoneSnapshot).length !== 11) {
+    const phoneForBooking = useProfilePhone ? profilePhoneDigits : digitsOnly(customerPhoneSnapshot);
+    if (phoneForBooking.length !== 11) {
       setMessage({ type: "err", text: "Informe um celular com DDD (11 dígitos) no WhatsApp." });
       return;
     }
@@ -195,7 +206,7 @@ export function PackageReservationForm({
         breakfastKitSelections: breakfastKitAvailable ? breakfastKitSelections : adultShirtSizes.map(() => false),
         customerNameSnapshot: customerNameSnapshot.trim(),
         customerEmailSnapshot: customerEmailSnapshot.trim(),
-        customerPhoneSnapshot: customerPhoneSnapshot.trim(),
+        customerPhoneSnapshot: phoneForBooking,
         notes: notes.trim() || undefined,
         initialStatus: "PENDING" as const,
       };
@@ -556,18 +567,31 @@ export function PackageReservationForm({
             onChange={(e) => setCustomerEmailSnapshot(e.target.value)}
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-[var(--igh-secondary)]">Telefone / WhatsApp</label>
-          <input
-            required
-            className="mt-1 w-full rounded-lg border border-[var(--igh-border)] bg-[var(--background)] px-3 py-2 text-sm"
-            value={formatBrPhone(customerPhoneSnapshot)}
-            inputMode="numeric"
-            placeholder="(91) 99999-9999"
-            onChange={(e) => setCustomerPhoneSnapshot(digitsOnly(e.target.value))}
-          />
-          <div className="mt-1 text-xs text-[var(--igh-muted)]">Digite um celular com DDD (11 dígitos).</div>
-        </div>
+        {useProfilePhone ? (
+          <div className="rounded-lg border border-[var(--igh-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--igh-secondary)]">
+            <div className="text-xs font-medium text-[var(--igh-muted)]">WhatsApp da reserva</div>
+            <p className="mt-1">
+              Será usado o número do seu cadastro:{" "}
+              <span className="font-medium text-[var(--igh-secondary)]">{formatBrPhone(profilePhoneDigits)}</span>
+            </p>
+            <p className="mt-1 text-xs text-[var(--igh-muted)]">
+              Para alterar o número, acesse <Link href="/meus-dados">Meus dados</Link> antes de reservar.
+            </p>
+          </div>
+        ) : (
+          <div>
+            <label className="block text-sm font-medium text-[var(--igh-secondary)]">Telefone / WhatsApp</label>
+            <input
+              required
+              className="mt-1 w-full rounded-lg border border-[var(--igh-border)] bg-[var(--background)] px-3 py-2 text-sm"
+              value={formatBrPhone(customerPhoneSnapshot)}
+              inputMode="numeric"
+              placeholder="(91) 99999-9999"
+              onChange={(e) => setCustomerPhoneSnapshot(digitsOnly(e.target.value))}
+            />
+            <div className="mt-1 text-xs text-[var(--igh-muted)]">Digite um celular com DDD (11 dígitos).</div>
+          </div>
+        )}
         <div>
           <label className="block text-sm font-medium text-[var(--igh-secondary)]">Observações (opcional)</label>
           <textarea

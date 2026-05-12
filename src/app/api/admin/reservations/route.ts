@@ -7,8 +7,6 @@ import { createAuditLog } from "@/lib/audit";
 import { isCustomerPlaceholderEmail } from "@/lib/customer-placeholder-email";
 import { sendEmailAndRecord } from "@/lib/email/send-and-record";
 import { getEmailBranding, wrapBrandedEmail } from "@/lib/email/branding";
-import { generateTempPassword } from "@/lib/password";
-import { hashPassword } from "@/lib/auth";
 import {
   createReservationInTransaction,
   ReservationCreateError,
@@ -199,35 +197,17 @@ export async function POST(request: Request) {
     const loginUrl = branding.loginUrl;
     const resetUrl = branding.resetPasswordUrl;
 
-    // Não é possível recuperar a senha atual. Para informar "senha" no e-mail,
-    // geramos uma senha temporária e forçamos troca no primeiro acesso.
-    // (somente se realmente vamos enviar e-mail ao cliente).
     const customerEmail = reservation.customerEmailSnapshot.trim();
     const sendToCustomer = customerEmail.length > 0 && !isCustomerPlaceholderEmail(customerEmail);
-    const tempPassword = sendToCustomer ? generateTempPassword() : null;
-    if (tempPassword) {
-      const passwordHash = await hashPassword(tempPassword);
-      await prisma.user.update({
-        where: { id: target.id },
-        data: { passwordHash, mustChangePassword: true },
-      });
-    }
 
     const pre = summaryText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const accessBlock = `
       <div style="margin: 14px 0 0; padding: 14px; border:1px solid #e5e7eb; border-radius: 12px; background:#f9fafb;">
-        <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">Acesso à área do cliente</div>
+        <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">Acompanhar sua reserva</div>
         <div style="font-size: 13px; color:#111827;">
-          <div><strong>Link:</strong> <a href="${loginUrl}">${loginUrl}</a></div>
-          <div><strong>E-mail:</strong> ${escapeHtml(target.email)}</div>
-          ${
-            tempPassword
-              ? `<div><strong>Senha temporária:</strong> <code style="background:#fff; padding:2px 6px; border:1px solid #e5e7eb; border-radius:6px;">${escapeHtml(
-                  tempPassword
-                )}</code></div>
-                 <div style="margin-top:6px; font-size: 12px; color:#6b7280;">Por segurança, você deverá trocar a senha no primeiro acesso.</div>`
-              : `<div style="margin-top:6px; font-size: 12px; color:#6b7280;">Se você não lembrar sua senha, use: <a href="${resetUrl}">${resetUrl}</a></div>`
-          }
+          <div><strong>Área do cliente:</strong> <a href="${loginUrl}">${loginUrl}</a></div>
+          <div><strong>E-mail de acesso:</strong> ${escapeHtml(target.email)}</div>
+          <div style="margin-top:8px; font-size: 12px; color:#6b7280;">Entre com o <strong>e-mail cadastrado e sua senha</strong>. Se esquecer a senha, redefina em: <a href="${resetUrl}">${resetUrl}</a></div>
         </div>
       </div>
     `;

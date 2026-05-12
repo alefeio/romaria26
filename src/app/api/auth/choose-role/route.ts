@@ -34,7 +34,16 @@ export async function POST(request: Request) {
 
   const full = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { id: true, name: true, email: true, role: true, isAdmin: true, isActive: true, mustChangePassword: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      role: true,
+      isAdmin: true,
+      isActive: true,
+      mustChangePassword: true,
+    },
   });
   if (!full || !full.isActive) {
     return jsonErr("UNAUTHORIZED", "Sessão inválida.", 401);
@@ -44,6 +53,7 @@ export async function POST(request: Request) {
     id: full.id,
     name: full.name,
     email: full.email,
+    phone: full.phone,
     role: full.role,
     isActive: full.isActive,
     mustChangePassword: full.mustChangePassword ?? false,

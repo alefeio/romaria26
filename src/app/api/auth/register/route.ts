@@ -34,7 +34,16 @@ export async function POST(request: Request) {
         mustChangePassword: false,
         isAdmin: false,
       },
-      select: { id: true, name: true, email: true, role: true, isActive: true, mustChangePassword: true, isAdmin: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        mustChangePassword: true,
+        isAdmin: true,
+      },
     });
 
     const token = await buildAuthSessionToken(user);
