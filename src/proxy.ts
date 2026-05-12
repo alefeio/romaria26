@@ -33,7 +33,7 @@ export async function proxy(request: NextRequest) {
   const dashboardUrl = new URL("/dashboard", request.url);
 
   if (pathname.startsWith("/users")) {
-    if (role !== "MASTER") {
+    if (role !== "MASTER" && role !== "ADMIN") {
       return NextResponse.redirect(dashboardUrl);
     }
   }

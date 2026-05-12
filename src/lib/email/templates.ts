@@ -56,20 +56,46 @@ export function templateAdminWelcome(params: {
   name: string;
   email: string;
   tempPassword: string;
+  /** URL absoluta do login (opcional; padrão APP_URL). */
+  loginUrl?: string;
+  /** URL absoluta da página “copiar senha” (token cifrado). */
+  copyPasswordUrl: string;
 }): { subject: string; html: string } {
-  const { name, email, tempPassword } = params;
-  const loginUrl = getAppUrl("/login");
+  const { name, email, tempPassword, copyPasswordUrl } = params;
+  const loginUrl = params.loginUrl ?? getAppUrl("/login");
+  const copyHref = escapeHtml(copyPasswordUrl);
+  const copyButton = `
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:20px 0;">
+  <tr>
+    <td style="border-radius:10px;background:#1d4ed8;">
+      <a href="${copyHref}" target="_blank" rel="noopener noreferrer"
+        style="display:inline-block;padding:16px 28px;font-family:system-ui,-apple-system,sans-serif;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;line-height:1.2;">
+        Copiar senha no celular
+      </a>
+    </td>
+  </tr>
+</table>`;
   const body = `
-<h2>Acesso liberado - Área administrativa</h2>
+<h2 style="margin:0 0 12px;font-size:22px;color:#111827;">Acesso liberado — Área administrativa</h2>
 <p>Olá, <strong>${escapeHtml(name)}</strong>.</p>
 <p>Seu cadastro na área administrativa foi realizado. Use os dados abaixo para acessar o sistema:</p>
-<ul>
-  <li><strong>Link de acesso:</strong> <a href="${loginUrl}">${loginUrl}</a></li>
-  <li><strong>Usuário (e-mail):</strong> ${escapeHtml(email)}</li>
-  <li><strong>Senha temporária:</strong> <code style="background:#f0f0f0;padding:2px 6px;">${escapeHtml(tempPassword)}</code></li>
+<ul style="padding-left:20px;margin:12px 0;">
+  <li style="margin:6px 0;"><strong>Link de acesso:</strong> <a href="${escapeHtml(loginUrl)}">${escapeHtml(loginUrl)}</a></li>
+  <li style="margin:6px 0;"><strong>Usuário (e-mail):</strong> ${escapeHtml(email)}</li>
 </ul>
-<p><strong>Importante:</strong> Por segurança, você deverá trocar a senha no primeiro acesso.</p>
-<p>Guarde esta mensagem em local seguro até alterar sua senha. Não compartilhe sua senha com ninguém.</p>
+<p style="margin:16px 0 8px;font-weight:600;color:#374151;">Senha temporária</p>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 8px;">
+  <tr>
+    <td style="font-size:20px;font-family:ui-monospace,Menlo,Consolas,monospace;padding:16px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;text-align:center;letter-spacing:0.06em;color:#111827;">
+      ${escapeHtml(tempPassword)}
+    </td>
+  </tr>
+</table>
+<p style="font-size:14px;color:#4b5563;margin:0 0 8px;">No celular, toque no botão abaixo para abrir uma página onde você pode <strong>copiar a senha com um toque</strong> (sem precisar selecionar o texto no e-mail).</p>
+${copyButton}
+<p style="font-size:13px;color:#6b7280;margin:0 0 16px;">O link do botão expira em <strong>72 horas</strong>. Se não abrir, copie e cole no navegador:<br/><a href="${copyHref}" style="word-break:break-all;color:#2563eb;">${copyHref}</a></p>
+<p><strong>Importante:</strong> por segurança, você deverá <strong>trocar a senha no primeiro acesso</strong>.</p>
+<p style="font-size:13px;color:#6b7280;">Guarde esta mensagem em local seguro até alterar sua senha. Não compartilhe sua senha com ninguém.</p>
 `;
   return { subject: "Acesso liberado - Área administrativa", html: wrapHtml(body) };
 }

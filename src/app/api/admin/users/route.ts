@@ -6,12 +6,14 @@ import { createAuditLog } from "@/lib/audit";
 import { generateTempPassword } from "@/lib/password";
 import { sendEmailAndRecord } from "@/lib/email/send-and-record";
 import { templateAdminWelcome } from "@/lib/email/templates";
+import { createAdminWelcomeCopyToken } from "@/lib/admin-welcome-copy-token";
+import { resolvePublicAppUrl } from "@/lib/email";
 
 export async function GET() {
-  await requireRole("MASTER");
+  await requireRole(["ADMIN", "MASTER"]);
 
   const users = await prisma.user.findMany({
-    where: { OR: [{ role: "ADMIN" }, { isAdmin: true }] },
+    where: { OR: [{ role: "ADMIN" }, { role: "MASTER" }, { isAdmin: true }] },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -29,7 +31,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const master = await requireRole("MASTER");
+  const actor = await requireRole(["ADMIN", "MASTER"]);
 
   const body = await request.json().catch(() => null);
   const parsed = createAdminSchema.safeParse(body);
@@ -61,7 +63,7 @@ export async function POST(request: Request) {
         entityId: updated.id,
         action: "ADMIN_ACCESS_GRANTED",
         diff: { email: updated.email, previousRole: existing.role },
-        performedByUserId: master.id,
+        performedByUserId: actor.id,
       });
       return jsonOk(
         {
@@ -93,29 +95,45 @@ export async function POST(request: Request) {
     entityId: created.id,
     action: "USER_CREATED",
     diff: { created: { id: created.id, email: created.email, role: created.role } },
-    performedByUserId: master.id,
+    performedByUserId: actor.id,
   });
+
+  const base = await resolvePublicAppUrl();
+  const loginUrl = `${base}/login`;
+  const copyToken = await createAdminWelcomeCopyToken({
+    email: created.email,
+    tempPassword,
+  });
+  const copyPasswordUrl = `${base}/admin/copiar-acesso?t=${encodeURIComponent(copyToken)}`;
 
   const { subject, html } = templateAdminWelcome({
     name: created.name,
     email: created.email,
     tempPassword,
+    loginUrl,
+    copyPasswordUrl,
   });
-  const emailResult = await sendEmailAndRecord({
+
+  const emailParams = {
     to: created.email,
     subject,
     html,
-    emailType: "welcome_admin",
-    entityType: "User",
+    emailType: "welcome_admin" as const,
+    entityType: "User" as const,
     entityId: created.id,
-    performedByUserId: master.id,
-  });
+    performedByUserId: actor.id,
+  };
+  let emailResult = await sendEmailAndRecord(emailParams);
+  if (!emailResult.success) {
+    await new Promise((r) => setTimeout(r, 1500));
+    emailResult = await sendEmailAndRecord(emailParams);
+  }
   await createAuditLog({
     entityType: "User",
     entityId: created.id,
     action: "EMAIL_SENT",
     diff: { type: "welcome_admin", success: emailResult.success, messageId: emailResult.messageId },
-    performedByUserId: master.id,
+    performedByUserId: actor.id,
   });
 
   return jsonOk(

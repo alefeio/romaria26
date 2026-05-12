@@ -25,7 +25,7 @@ const ITEMS: Item[] = [
   { href: "/admin/faturamento", label: "Faturamento", adminOrMaster: true, category: "Operação" },
   { href: "/admin/sms", label: "Campanhas SMS", adminOrMaster: true, category: "Operação" },
   { href: "/admin/email", label: "Campanhas de e-mail", adminOrMaster: true, category: "Operação" },
-  { href: "/users", label: "Usuários", masterOnly: true, category: "Administração" },
+  { href: "/users", label: "Usuários admin", adminOrMaster: true, category: "Administração" },
   { href: "/admin/site/configuracoes", label: "Configurações", adminOrMaster: true, category: "Site" },
   { href: "/admin/site/mensagens-contato", label: "Mensagens de contato", adminOrMaster: true, category: "Site" },
   { href: "/admin/site/sobre", label: "Sobre", adminOrMaster: true, category: "Site" },

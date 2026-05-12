@@ -17,11 +17,22 @@ type AdminUser = {
   id: string;
   name: string;
   email: string;
-  role: "ADMIN" | "STUDENT" | "TEACHER";
+  role: "ADMIN" | "MASTER" | "CUSTOMER";
   isAdmin?: boolean;
   isActive: boolean;
   createdAt: string;
 };
+
+function isMasterRow(u: AdminUser): boolean {
+  return u.role === "MASTER";
+}
+
+function adminProfileLabel(u: AdminUser): string {
+  if (u.role === "MASTER") return "Master";
+  if (u.role === "ADMIN") return "Administrador";
+  if (u.isAdmin) return "Cliente com acesso admin";
+  return u.role;
+}
 
 export default function UsersPage() {
   const toast = useToast();
@@ -71,6 +82,10 @@ export default function UsersPage() {
   }, []);
 
   function openEdit(u: AdminUser) {
+    if (isMasterRow(u)) {
+      toast.push("error", "A conta Master não pode ser editada nesta tela.");
+      return;
+    }
     setEditing(u);
     setEditName(u.name);
     setEditEmail(u.email);
@@ -111,6 +126,7 @@ export default function UsersPage() {
   }
 
   async function deactivateUser(u: AdminUser) {
+    if (isMasterRow(u)) return;
     if (!confirm(`Desativar o usuário "${u.name}"? Ele não poderá mais fazer login.`)) return;
     const res = await fetch(`/api/admin/users/${u.id}`, { method: "DELETE" });
     const json = (await res.json()) as ApiResponse<{ user: AdminUser }>;
@@ -123,6 +139,7 @@ export default function UsersPage() {
   }
 
   async function reactivateUser(u: AdminUser) {
+    if (isMasterRow(u)) return;
     const res = await fetch(`/api/admin/users/${u.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
@@ -138,6 +155,7 @@ export default function UsersPage() {
   }
 
   async function deleteUserPermanent(u: AdminUser) {
+    if (isMasterRow(u)) return;
     if (!confirm(`Excluir definitivamente o usuário "${u.name}"? Esta ação não pode ser desfeita.`)) return;
     const res = await fetch(`/api/admin/users/${u.id}?permanent=true`, { method: "DELETE" });
     const json = (await res.json()) as ApiResponse<{ deleted?: boolean }>;
@@ -172,14 +190,17 @@ export default function UsersPage() {
       if (json.data.alreadyRegisteredAs) {
         toast.push(
           "success",
-        `Usuário já cadastrado como ${json.data.alreadyRegisteredAs}. Foi concedido acesso como Admin. Ao entrar no sistema, ele poderá escolher usar como ${json.data.alreadyRegisteredAs} ou Admin.`
-      );
-    } else if (json.data.emailSent) {
-      toast.push("success", "Admin criado. E-mail de acesso enviado para o novo usuário.");
-    } else {
-      const senha = json.data.temporaryPassword ? ` Senha temporária: ${json.data.temporaryPassword}.` : "";
-      toast.push("error", `Admin criado, mas o e-mail não foi enviado. Passe o link de login e essa senha ao novo usuário.${senha}`);
-    }
+          `Usuário já cadastrado como ${json.data.alreadyRegisteredAs}. Foi concedido acesso como Admin. Ao entrar no sistema, ele poderá escolher usar como ${json.data.alreadyRegisteredAs} ou Admin.`
+        );
+      } else if (json.data.emailSent) {
+        toast.push("success", "Admin criado. E-mail de acesso enviado para o novo usuário.");
+      } else {
+        const senha = json.data.temporaryPassword ? ` Senha temporária: ${json.data.temporaryPassword}.` : "";
+        toast.push(
+          "error",
+          `Admin criado, mas o e-mail não foi enviado. Passe o link de login e essa senha ao novo usuário.${senha}`
+        );
+      }
       setOpen(false);
       setName("");
       setEmail("");
@@ -195,8 +216,8 @@ export default function UsersPage() {
     <div className="flex min-w-0 flex-col gap-8 sm:gap-10">
       <DashboardHero
         eyebrow="Administração"
-        title="Usuários ADMIN"
-        description='Contas com perfil administrativo. Por padrão, apenas ativos — use "Exibir inativos" para reativar ou excluir.'
+        title="Usuários admin"
+        description='Crie e edite contas administrativas (perfil Administrador). O sistema mantém uma única conta Master; ela aparece na lista apenas para referência e não pode ser criada, editada ou inativada aqui. Por padrão, só ativos — use "Exibir inativos" para reativar ou excluir.'
         rightSlot={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
             <Button
@@ -208,7 +229,7 @@ export default function UsersPage() {
               {showInactive ? "Ocultar inativos" : "Exibir inativos"}
             </Button>
             <Button onClick={() => setOpen(true)} className="w-full sm:w-auto">
-              Novo ADMIN
+              Novo administrador
             </Button>
           </div>
         }
@@ -234,58 +255,75 @@ export default function UsersPage() {
             <tr>
               <Th>Nome</Th>
               <Th>E-mail</Th>
+              <Th>Perfil</Th>
               <Th>Status</Th>
               <Th>Criado em</Th>
               <Th />
             </tr>
           </thead>
           <tbody>
-            {visibleUsers.map((u) => (
-              <tr key={u.id}>
-                <Td>{u.name}</Td>
-                <Td>{u.email}</Td>
-                <Td>
-                  {u.isActive ? (
-                    <Badge tone="green">Ativo</Badge>
-                  ) : (
-                    <Badge tone="red">Inativo</Badge>
-                  )}
-                </Td>
-                <Td>{formatDateTime(u.createdAt)}</Td>
-                <Td>
-                  <div className="flex justify-end gap-2">
-                    <Button variant="secondary" onClick={() => openEdit(u)}>
-                      Editar
-                    </Button>
-                    {u.isActive ? (
-                      <Button
-                        variant="secondary"
-                        onClick={() => deactivateUser(u)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        Inativar
-                      </Button>
+            {visibleUsers.map((u) => {
+              const master = isMasterRow(u);
+              return (
+                <tr key={u.id}>
+                  <Td>{u.name}</Td>
+                  <Td>{u.email}</Td>
+                  <Td>
+                    {master ? (
+                      <Badge tone="violet">Master</Badge>
                     ) : (
-                      <>
-                        <Button variant="secondary" onClick={() => reactivateUser(u)}>
-                          Reativar
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          onClick={() => deleteUserPermanent(u)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          Excluir
-                        </Button>
-                      </>
+                      <span className="text-sm text-[var(--text-secondary)]">{adminProfileLabel(u)}</span>
                     )}
-                  </div>
-                </Td>
-              </tr>
-            ))}
+                  </Td>
+                  <Td>
+                    {u.isActive ? (
+                      <Badge tone="green">Ativo</Badge>
+                    ) : (
+                      <Badge tone="red">Inativo</Badge>
+                    )}
+                  </Td>
+                  <Td>{formatDateTime(u.createdAt)}</Td>
+                  <Td>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {master ? (
+                        <span className="text-xs text-[var(--text-muted)]">Somente leitura</span>
+                      ) : (
+                        <>
+                          <Button variant="secondary" onClick={() => openEdit(u)}>
+                            Editar
+                          </Button>
+                          {u.isActive ? (
+                            <Button
+                              variant="secondary"
+                              onClick={() => deactivateUser(u)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              Inativar
+                            </Button>
+                          ) : (
+                            <>
+                              <Button variant="secondary" onClick={() => reactivateUser(u)}>
+                                Reativar
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                onClick={() => deleteUserPermanent(u)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                Excluir
+                              </Button>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </Td>
+                </tr>
+              );
+            })}
             {visibleUsers.length === 0 ? (
               <tr>
-                <Td colSpan={5}>
+                <Td colSpan={6}>
                   <span className="text-[var(--text-secondary)]">
                     {showInactive ? "Nenhum usuário encontrado." : "Nenhum ADMIN ativo cadastrado."}
                   </span>
@@ -344,7 +382,7 @@ export default function UsersPage() {
         </form>
       </Modal>
 
-      <Modal open={open} title="Criar usuário ADMIN" onClose={() => { setOpen(false); setName(""); setEmail(""); }}>
+      <Modal open={open} title="Novo administrador" onClose={() => { setOpen(false); setName(""); setEmail(""); }}>
         <form className="flex flex-col gap-3" onSubmit={createAdmin}>
           <div>
             <label className="text-sm font-medium">Nome</label>
@@ -359,7 +397,7 @@ export default function UsersPage() {
             </div>
           </div>
           <p className="text-xs text-[var(--text-muted)]">
-            Uma senha temporária será gerada e enviada por e-mail ao usuário. Ele deverá trocá-la no primeiro acesso.
+            Será criada uma conta com perfil <strong className="font-medium">Administrador</strong> (não Master). Uma senha temporária será gerada e enviada por e-mail; o usuário deverá trocá-la no primeiro acesso.
           </p>
           <div className="flex items-center justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>

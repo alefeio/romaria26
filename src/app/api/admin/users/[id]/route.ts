@@ -8,7 +8,7 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const master = await requireRole("MASTER");
+  const actor = await requireRole(["ADMIN", "MASTER"]);
   const { id } = await context.params;
 
   const body = await request.json().catch(() => null);
@@ -43,7 +43,7 @@ export async function PATCH(
     entityId: id,
     action: "ADMIN_UPDATE",
     diff: { before: existing, after: updated },
-    performedByUserId: master.id,
+    performedByUserId: actor.id,
   });
 
   return jsonOk({ user: updated });
@@ -53,10 +53,10 @@ export async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const master = await requireRole("MASTER");
+  const actor = await requireRole(["ADMIN", "MASTER"]);
   const { id } = await context.params;
 
-  if (id === master.id) {
+  if (id === actor.id) {
     return jsonErr("FORBIDDEN", "Não é permitido desativar o próprio usuário.", 403);
   }
 
@@ -77,7 +77,7 @@ export async function DELETE(
       entityId: id,
       action: "ADMIN_DELETE",
       diff: { before: existing },
-      performedByUserId: master.id,
+      performedByUserId: actor.id,
     });
     return jsonOk({ deleted: true });
   }
@@ -93,7 +93,7 @@ export async function DELETE(
     entityId: id,
     action: "ADMIN_DEACTIVATE",
     diff: { before: existing, after: updated },
-    performedByUserId: master.id,
+    performedByUserId: actor.id,
   });
 
   return jsonOk({ user: updated });
