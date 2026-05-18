@@ -20,7 +20,7 @@ export function formatVoucherCode(n: number): string {
 
 type TxClient = Parameters<typeof prisma.$transaction>[0] extends (arg: infer T) => any ? T : never;
 
-async function allocateNextVoucherNumber(
+export async function allocateNextVoucherNumber(
   tx: TxClient,
   packageId: string,
   range: { from: number; to: number }

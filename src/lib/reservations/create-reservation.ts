@@ -132,11 +132,11 @@ export async function createReservationInTransaction(
   }
 
   if (!Array.isArray(childrenAges) || childrenAges.length !== childrenCount) {
-    throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "Informe a idade (6 a 10) para cada criança.");
+    throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "Informe a idade (0 a 10) para cada criança.");
   }
   const childAgeNums = childrenAges.map((n) => (typeof n === "number" ? n : Number(n)));
-  if (childAgeNums.some((n) => !Number.isInteger(n) || n < 6 || n > 10)) {
-    throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "A idade das crianças deve ser entre 6 e 10 anos.");
+  if (childAgeNums.some((n) => !Number.isInteger(n) || n < 0 || n > 10)) {
+    throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "A idade das crianças deve ser entre 0 e 10 anos.");
   }
 
   if (!Array.isArray(childrenShirtNumbers) || childrenShirtNumbers.length !== childrenCount) {
@@ -258,7 +258,8 @@ export async function createReservationInTransaction(
     const childUnit = new Prisma.Decimal(pkg.childPrice.toString());
     const breakfastUnit = new Prisma.Decimal(pkg.breakfastKitPrice.toString());
     const kitCount = kits.filter(Boolean).length;
-    const totalPrice = adultUnit.mul(adultsCount).add(childUnit.mul(childrenCount)).add(breakfastUnit.mul(kitCount));
+    const paidChildrenCount = childAgeNums.filter((age) => age >= 6).length;
+    const totalPrice = adultUnit.mul(adultsCount).add(childUnit.mul(paidChildrenCount)).add(breakfastUnit.mul(kitCount));
     const totalDue = totalPrice;
 
     const now = new Date();

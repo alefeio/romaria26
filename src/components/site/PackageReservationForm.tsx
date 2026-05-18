@@ -11,6 +11,7 @@ type Props = {
   breakfastKitAvailable: boolean;
   breakfastKitPrice: string;
   unitPrice: string;
+  childPrice: string;
   remainingPlaces: number | null;
   kitsDeliveryInfo?: string | null;
   defaultName?: string;
@@ -34,6 +35,7 @@ export function PackageReservationForm({
   breakfastKitAvailable,
   breakfastKitPrice,
   unitPrice,
+  childPrice,
   remainingPlaces,
   kitsDeliveryInfo = null,
   defaultName = "",
@@ -137,12 +139,16 @@ export function PackageReservationForm({
   }
 
   const estimatedTotal = useMemo(() => {
-    const base = Number.parseFloat(unitPrice) || 0;
+    const adultUnit = Number.parseFloat(unitPrice) || 0;
+    const childUnit = Number.parseFloat(childPrice) || 0;
     const kitUnit = Number.parseFloat(breakfastKitPrice) || 0;
     const kitCount = breakfastKitSelections.filter(Boolean).length;
-    const total = base * shirtCount + kitUnit * kitCount;
+    const paidChildrenCount = childrenAges
+      .slice(0, childrenCount)
+      .filter((age) => Number.isInteger(age) && age >= 6).length;
+    const total = adultUnit * adultsCount + childUnit * paidChildrenCount + kitUnit * kitCount;
     return total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  }, [unitPrice, breakfastKitPrice, breakfastKitSelections, shirtCount]);
+  }, [unitPrice, childPrice, breakfastKitPrice, breakfastKitSelections, adultsCount, childrenAges, childrenCount]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -163,9 +169,9 @@ export function PackageReservationForm({
         setMessage({ type: "err", text: "Informe o nome completo para cada criança." });
         return;
       }
-      const invalidAge = childrenAges.some((n) => !Number.isInteger(n) || n < 6 || n > 10);
+      const invalidAge = childrenAges.some((n) => !Number.isInteger(n) || n < 0 || n > 10);
       if (invalidAge) {
-        setMessage({ type: "err", text: "A idade das crianças deve ser entre 6 e 10 anos." });
+        setMessage({ type: "err", text: "A idade das crianças deve ser entre 0 e 10 anos." });
         return;
       }
     }
@@ -491,10 +497,7 @@ export function PackageReservationForm({
                           </div>
                           <div>
                             <div className="text-xs text-[var(--igh-muted)]">Idade</div>
-                            <input
-                              type="number"
-                              min={6}
-                              max={10}
+                            <select
                               required
                               className="mt-1 w-full rounded-lg border border-[var(--igh-border)] bg-[var(--background)] px-3 py-2 text-sm"
                               value={childrenAges[cidx] ?? 6}
@@ -505,7 +508,16 @@ export function PackageReservationForm({
                                   return next;
                                 })
                               }
-                            />
+                            >
+                              {Array.from({ length: 11 }, (_, age) => (
+                                <option key={age} value={age}>
+                                  {age === 0 ? "Menor de 1 ano" : `${age} ${age === 1 ? "ano" : "anos"}`}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="mt-1 text-xs text-[var(--igh-muted)]">
+                              Abaixo de 6 anos gera voucher sem cobrança.
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-[var(--igh-muted)]">Tamanho da camisa</div>

@@ -259,7 +259,7 @@ export default function AdminClienteDetailPage() {
                   <Th className="text-right">Total</Th>
                   <Th>Status</Th>
                   <Th>Pagamento</Th>
-                  <Th className="text-right">Pagamentos</Th>
+                  <Th className="text-right">Ações</Th>
                 </tr>
               </thead>
               <tbody>
@@ -285,12 +285,20 @@ export default function AdminClienteDetailPage() {
                       </div>
                     </Td>
                     <Td className="text-right">
-                      <Link
-                        href={`/admin/reservas/${r.id}/pagamentos`}
-                        className="text-sm font-medium text-[var(--igh-primary)] hover:underline"
-                      >
-                        Abrir
-                      </Link>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Link
+                          href={`/admin/reservas/${r.id}`}
+                          className="text-sm font-medium text-[var(--igh-primary)] hover:underline"
+                        >
+                          Detalhes
+                        </Link>
+                        <Link
+                          href={`/admin/reservas/${r.id}/pagamentos`}
+                          className="text-sm font-medium text-[var(--text-muted)] hover:text-[var(--igh-primary)] hover:underline"
+                        >
+                          Pagamentos
+                        </Link>
+                      </div>
                     </Td>
                   </tr>
                 ))}

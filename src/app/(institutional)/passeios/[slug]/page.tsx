@@ -95,6 +95,7 @@ export default async function PasseioDetalhePage({ params }: Props) {
             breakfastKitAvailable={pkg.breakfastKitAvailable}
             breakfastKitPrice={pkg.breakfastKitPrice}
             unitPrice={pkg.price}
+            childPrice={pkg.childPrice}
             remainingPlaces={pkg.remainingPlaces}
             kitsDeliveryInfo={pkg.kitsDeliveryInfo}
             defaultName={session?.name ?? ""}

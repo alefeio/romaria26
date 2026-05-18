@@ -159,6 +159,7 @@ export default function AdminClienteNovaReservaPage() {
                 breakfastKitAvailable={detail.breakfastKitAvailable}
                 breakfastKitPrice={detail.breakfastKitPrice}
                 unitPrice={detail.price}
+                childPrice={detail.childPrice}
                 remainingPlaces={detail.remainingPlaces}
                 kitsDeliveryInfo={detail.kitsDeliveryInfo}
                 defaultName={defaultName}

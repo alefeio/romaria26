@@ -79,6 +79,7 @@ export default function AdminReservaPagamentosPage() {
   const [payNote, setPayNote] = useState("");
   const [savingPay, setSavingPay] = useState(false);
   const [actingInstallmentId, setActingInstallmentId] = useState<string | null>(null);
+  const [actingPaymentId, setActingPaymentId] = useState<string | null>(null);
 
   const [instOpen, setInstOpen] = useState(false);
   const [instDueDate, setInstDueDate] = useState("");
@@ -228,9 +229,33 @@ export default function AdminReservaPagamentosPage() {
     }
   }
 
+  async function deletePayment(paymentId: string) {
+    if (!id) return;
+    if (
+      !window.confirm(
+        "Excluir este registro de pagamento? O total pago da reserva será recalculado. Se o pagamento estiver ligado a uma parcela, ela voltará para agendada."
+      )
+    ) {
+      return;
+    }
+    setActingPaymentId(paymentId);
+    try {
+      const res = await fetch(`/api/admin/reservations/${id}/payments/${paymentId}`, { method: "DELETE" });
+      const json = (await res.json()) as ApiResponse<unknown>;
+      if (!res.ok || !json.ok) {
+        toast.push("error", !json.ok ? (json as { ok: false; error: { message: string } }).error.message : "Falha ao excluir pagamento.");
+        return;
+      }
+      toast.push("success", "Pagamento excluído.");
+      await load();
+    } finally {
+      setActingPaymentId(null);
+    }
+  }
+
   async function deleteInstallment(installmentId: string) {
     if (!id) return;
-    if (!window.confirm("Excluir esta parcela?")) return;
+    if (!window.confirm("Excluir o agendamento desta parcela? Esta ação não pode ser desfeita.")) return;
     setActingInstallmentId(installmentId);
     try {
       const res = await fetch(`/api/admin/reservations/${id}/installments/${installmentId}`, { method: "DELETE" });
@@ -367,6 +392,7 @@ export default function AdminReservaPagamentosPage() {
                   <Th className="text-right">Valor</Th>
                   <Th>Comprovante</Th>
                   <Th>Obs.</Th>
+                  <Th className="text-right">Ações</Th>
                 </tr>
               </thead>
               <tbody>
@@ -387,11 +413,22 @@ export default function AdminReservaPagamentosPage() {
                       )}
                     </Td>
                     <Td className="text-xs text-[var(--text-muted)]">{p.note ?? "-"}</Td>
+                    <Td className="text-right">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="danger"
+                        disabled={actingPaymentId === p.id}
+                        onClick={() => void deletePayment(p.id)}
+                      >
+                        Excluir
+                      </Button>
+                    </Td>
                   </tr>
                 ))}
                 {payments.length === 0 ? (
                   <tr>
-                    <Td colSpan={5} className="py-10 text-center text-[var(--text-muted)]">
+                    <Td colSpan={6} className="py-10 text-center text-[var(--text-muted)]">
                       Nenhum pagamento registrado.
                     </Td>
                   </tr>
@@ -427,15 +464,6 @@ export default function AdminReservaPagamentosPage() {
                       <div className="flex flex-wrap justify-end gap-1">
                         {i.status === "SCHEDULED" ? (
                           <>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              disabled={actingInstallmentId === i.id}
-                              onClick={() => openPayModal({ mode: "INSTALLMENT", installmentId: i.id })}
-                            >
-                              Registrar pagamento
-                            </Button>
                             <Button
                               type="button"
                               size="sm"
