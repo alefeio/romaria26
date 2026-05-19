@@ -6,9 +6,8 @@ import QRCode from "qrcode";
 
 import { prisma } from "@/lib/prisma";
 import { BRAZIL_TIMEZONE } from "@/lib/datetime-brazil";
-import { getSessionUserFromCookie } from "@/lib/auth";
+import { getSessionUserFromCookie, verifyPassword } from "@/lib/auth";
 import { resolvePublicAppUrl } from "@/lib/email";
-import { verifyPassword } from "@/lib/auth";
 
 type Props = { params: Promise<{ code: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
@@ -22,6 +21,28 @@ function formatWhen(d: Date, time: string): string {
   return `${date} às ${time}`;
 }
 
+function accessDeniedCard(opts: { title: string; body: string; showLogin?: boolean }) {
+  return (
+    <main className="mx-auto max-w-xl px-4 py-10">
+      <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
+        <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Acesso restrito</div>
+        <h1 className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">{opts.title}</h1>
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">{opts.body}</p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          {opts.showLogin ? (
+            <Link href="/login" className="text-sm font-medium text-[var(--igh-primary)] hover:underline">
+              Entrar
+            </Link>
+          ) : null}
+          <Link href="/" className="text-sm font-medium text-[var(--text-muted)] hover:text-[var(--igh-primary)] hover:underline">
+            Início
+          </Link>
+        </div>
+      </div>
+    </main>
+  );
+}
+
 export default async function VoucherPage({ params, searchParams }: Props) {
   const { code } = await params;
   const c = decodeURIComponent(code ?? "").trim();
@@ -31,6 +52,7 @@ export default async function VoucherPage({ params, searchParams }: Props) {
   const sp = await searchParams;
   const sharedId = typeof sp.s === "string" ? sp.s.trim() : "";
   const sharedPass = typeof sp.p === "string" ? sp.p.trim() : "";
+
   const v = await prisma.reservationVoucher.findFirst({
     where: { code: c },
     include: {
@@ -46,21 +68,34 @@ export default async function VoucherPage({ params, searchParams }: Props) {
   });
   if (!v) notFound();
 
-  // Acesso por compartilhamento (senha temporária) — válido para qualquer pessoa.
-  if (!session && sharedId && sharedPass) {
+  const hasAnyShareParam = Boolean(sharedId || sharedPass);
+  const hasFullShareParams = Boolean(sharedId && sharedPass);
+
+  if (hasAnyShareParam && !hasFullShareParams) {
+    return accessDeniedCard({
+      title: "Link incompleto",
+      body: "O link de compartilhamento está incompleto. Use o link completo enviado por WhatsApp (com os parâmetros de acesso).",
+    });
+  }
+
+  let shareAccessOk = false;
+  if (hasFullShareParams) {
     const share = await prisma.reservationVoucherShare.findFirst({
       where: { id: sharedId, voucherId: v.id },
       select: { passwordHash: true, expiresAt: true },
     });
-    const ok =
-      share && share.expiresAt.getTime() > Date.now()
-        ? await verifyPassword(sharedPass, share.passwordHash)
-        : false;
-    if (!ok) {
+    shareAccessOk = Boolean(
+      share &&
+        share.expiresAt.getTime() > Date.now() &&
+        (await verifyPassword(sharedPass, share.passwordHash))
+    );
+    if (!shareAccessOk) {
       return (
         <main className="mx-auto max-w-xl px-4 py-10">
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
-            <div className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-100">Acesso por compartilhamento</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-100">
+              Acesso por compartilhamento
+            </div>
             <h1 className="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-100">Senha inválida ou expirada</h1>
             <p className="mt-2 text-sm text-amber-800/90 dark:text-amber-200/90">
               Peça para o responsável compartilhar novamente o voucher para gerar uma nova senha temporária.
@@ -71,30 +106,49 @@ export default async function VoucherPage({ params, searchParams }: Props) {
     }
   }
 
-  // Clientes só podem ver o próprio voucher (para não expor dados pessoais).
-  if (session?.role === "CUSTOMER" && v.reservation.userId !== session.id) {
-    return (
-      <main className="mx-auto max-w-xl px-4 py-10">
-        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Acesso restrito</div>
-          <h1 className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">Voucher indisponível</h1>
-          <p className="mt-2 text-sm text-[var(--text-secondary)]">Você não tem permissão para ver este voucher.</p>
-          <div className="mt-4">
-            <Link href="/cliente/reservas" className="text-sm font-medium text-[var(--igh-primary)] hover:underline">
-              Ir para Minhas reservas
-            </Link>
+  const isStaff =
+    session &&
+    (session.role === "MASTER" || session.role === "ADMIN" || session.isAdmin === true || session.baseRole === "MASTER");
+  const isOwner = session?.role === "CUSTOMER" && v.reservation.userId === session.id;
+
+  const canView = shareAccessOk || Boolean(isStaff) || Boolean(isOwner);
+
+  if (!canView) {
+    if (!session) {
+      return accessDeniedCard({
+        title: "Voucher privado",
+        body:
+          "Este ingresso não pode ser aberto só pelo número na URL. Entre na sua conta (dono da reserva) ou use o link completo compartilhado por WhatsApp, com senha temporária.",
+        showLogin: true,
+      });
+    }
+    if (session.role === "CUSTOMER") {
+      return (
+        <main className="mx-auto max-w-xl px-4 py-10">
+          <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Acesso restrito</div>
+            <h1 className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">Voucher indisponível</h1>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">Você não tem permissão para ver este voucher.</p>
+            <div className="mt-4">
+              <Link href="/cliente/reservas" className="text-sm font-medium text-[var(--igh-primary)] hover:underline">
+                Ir para Minhas reservas
+              </Link>
+            </div>
           </div>
-        </div>
-      </main>
-    );
+        </main>
+      );
+    }
+    return accessDeniedCard({
+      title: "Acesso negado",
+      body: "Você não tem permissão para visualizar este voucher.",
+    });
   }
 
-  // Link de check-in é ADMIN-only; o QR Code deve apontar para ele.
   const base = await resolvePublicAppUrl();
   const checkinUrl = `${base}/admin/vouchers/${encodeURIComponent(v.code)}/checkin`;
   const qrDataUrl = await QRCode.toDataURL(checkinUrl, { margin: 1, scale: 8 });
   const label = v.personType === "ADULT" ? `Adulto #${v.personIndex + 1}` : `Criança #${v.personIndex + 1}`;
-  const age = v.personType === "CHILD" && v.age ? v.age : null;
+  const age = v.personType === "CHILD" && v.age != null ? v.age : null;
 
   return (
     <main className="mx-auto max-w-xl px-4 py-10">
@@ -153,4 +207,3 @@ export default async function VoucherPage({ params, searchParams }: Props) {
     </main>
   );
 }
-
