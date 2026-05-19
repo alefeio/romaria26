@@ -82,12 +82,16 @@ model Reservation {
   adultNames                    String[]          @default([])
   /** Tamanho (PP/P/M/G/...) por adulto. */
   adultShirtSizes               String[]          @default([])
+  /** Cortesia por adulto (mesma ordem dos adultos). */
+  adultCourtesySelections        Boolean[]         @default([])
   /** Nome completo por criança (mesma ordem de `childrenShirtNumbers` / `childrenAges`). */
   childrenNames                 String[]          @default([])
-  /** Idade por criança (regras atuais: 6 a 10). */
+  /** Idade por criança (0 a 10; abaixo de 6 não gera cobrança). */
   childrenAges                  Int[]             @default([])
   /** Crianças: número/tamanho da camisa (ex.: 6, 8, 10, 12). */
   childrenShirtNumbers          Int[]             @default([])
+  /** Cortesia por criança (mesma ordem das crianças). */
+  childrenCourtesySelections     Boolean[]         @default([])
   /** Café da manhã marcado por ingresso (adultos + crianças, nesta ordem: adultos primeiro). */
   breakfastSelections           Boolean[]         @default([])
   /** Kit café (pago) marcado por adulto (mesma ordem dos adultos). */

@@ -21,9 +21,11 @@ export type CreateReservationInput = {
   childrenCount: number;
   adultNames: string[];
   adultShirtSizes: string[];
+  adultCourtesySelections?: boolean[];
   childrenNames: string[];
   childrenAges: number[];
   childrenShirtNumbers: number[];
+  childrenCourtesySelections?: boolean[];
   breakfastSelections: boolean[];
   breakfastKitSelections: boolean[];
   paymentPreferenceMethod?: string | null;
@@ -72,9 +74,11 @@ export async function createReservationInTransaction(
     childrenCount,
     adultNames,
     adultShirtSizes,
+    adultCourtesySelections,
     childrenNames,
     childrenAges,
     childrenShirtNumbers,
+    childrenCourtesySelections,
     breakfastSelections,
     breakfastKitSelections,
     paymentPreferenceMethod,
@@ -122,6 +126,10 @@ export async function createReservationInTransaction(
   if (adultSizes.length !== adultsCount) {
     throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "Informe o tamanho da camisa para cada adulto.");
   }
+  const adultCourtesies =
+    Array.isArray(adultCourtesySelections) && adultCourtesySelections.length === adultsCount
+      ? adultCourtesySelections.map((v) => Boolean(v))
+      : Array.from({ length: adultsCount }, () => false);
 
   if (!Array.isArray(childrenNames) || childrenNames.length !== childrenCount) {
     throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "Informe o nome completo para cada criança.");
@@ -152,6 +160,10 @@ export async function createReservationInTransaction(
       "Número/tamanho da camisa das crianças deve ser um inteiro (ex.: 6, 8, 10, 12)."
     );
   }
+  const childCourtesies =
+    Array.isArray(childrenCourtesySelections) && childrenCourtesySelections.length === childrenCount
+      ? childrenCourtesySelections.map((v) => Boolean(v))
+      : Array.from({ length: childrenCount }, () => false);
 
   if (!Array.isArray(breakfastSelections) || breakfastSelections.length !== quantity) {
     throw new ReservationCreateError(
@@ -258,8 +270,9 @@ export async function createReservationInTransaction(
     const childUnit = new Prisma.Decimal(pkg.childPrice.toString());
     const breakfastUnit = new Prisma.Decimal(pkg.breakfastKitPrice.toString());
     const kitCount = kits.filter(Boolean).length;
-    const paidChildrenCount = childAgeNums.filter((age) => age >= 6).length;
-    const totalPrice = adultUnit.mul(adultsCount).add(childUnit.mul(paidChildrenCount)).add(breakfastUnit.mul(kitCount));
+    const paidAdultsCount = adultCourtesies.filter((isCourtesy) => !isCourtesy).length;
+    const paidChildrenCount = childAgeNums.filter((age, index) => age >= 6 && !childCourtesies[index]).length;
+    const totalPrice = adultUnit.mul(paidAdultsCount).add(childUnit.mul(paidChildrenCount)).add(breakfastUnit.mul(kitCount));
     const totalDue = totalPrice;
 
     const now = new Date();
@@ -277,9 +290,11 @@ export async function createReservationInTransaction(
         childrenCount,
         adultNames: adultFullNames,
         adultShirtSizes: adultSizes,
+        adultCourtesySelections: adultCourtesies,
         childrenNames: childFullNames,
         childrenAges: childAgeNums,
         childrenShirtNumbers: childNums,
+        childrenCourtesySelections: childCourtesies,
         breakfastSelections: breakfasts,
         breakfastKitSelections: kits,
         includesBreakfastKit: kits.some(Boolean),

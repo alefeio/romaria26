@@ -74,9 +74,11 @@ export function PackageReservationForm({
   const [paymentPreferenceInstallments, setPaymentPreferenceInstallments] = useState<number>(1);
   const [adultNames, setAdultNames] = useState<string[]>([defaultName || ""]);
   const [adultShirtSizes, setAdultShirtSizes] = useState<string[]>(["M"]);
+  const [adultCourtesySelections, setAdultCourtesySelections] = useState<boolean[]>([false]);
   const [childrenNames, setChildrenNames] = useState<string[]>([]);
   const [childrenAges, setChildrenAges] = useState<number[]>([]);
   const [childrenShirtNumbers, setChildrenShirtNumbers] = useState<number[]>([]);
+  const [childrenCourtesySelections, setChildrenCourtesySelections] = useState<boolean[]>([]);
   const [breakfastKitSelections, setBreakfastKitSelections] = useState<boolean[]>([false]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
@@ -103,6 +105,11 @@ export function PackageReservationForm({
       while (next.length < adultsCount) next.push(prev[prev.length - 1] ?? "M");
       return next;
     });
+    setAdultCourtesySelections((prev) => {
+      const next = prev.slice(0, adultsCount);
+      while (next.length < adultsCount) next.push(false);
+      return next;
+    });
     setChildrenNames((prev) => {
       const next = prev.slice(0, childrenCount);
       while (next.length < childrenCount) next.push("");
@@ -116,6 +123,11 @@ export function PackageReservationForm({
     setChildrenShirtNumbers((prev) => {
       const next = prev.slice(0, childrenCount);
       while (next.length < childrenCount) next.push(6);
+      return next;
+    });
+    setChildrenCourtesySelections((prev) => {
+      const next = prev.slice(0, childrenCount);
+      while (next.length < childrenCount) next.push(false);
       return next;
     });
     setBreakfastKitSelections((prev) => {
@@ -143,12 +155,25 @@ export function PackageReservationForm({
     const childUnit = Number.parseFloat(childPrice) || 0;
     const kitUnit = Number.parseFloat(breakfastKitPrice) || 0;
     const kitCount = breakfastKitSelections.filter(Boolean).length;
+    const paidAdultsCount = adultCourtesySelections
+      .slice(0, adultsCount)
+      .filter((isCourtesy) => !isCourtesy).length;
     const paidChildrenCount = childrenAges
       .slice(0, childrenCount)
-      .filter((age) => Number.isInteger(age) && age >= 6).length;
-    const total = adultUnit * adultsCount + childUnit * paidChildrenCount + kitUnit * kitCount;
+      .filter((age, index) => Number.isInteger(age) && age >= 6 && !childrenCourtesySelections[index]).length;
+    const total = adultUnit * paidAdultsCount + childUnit * paidChildrenCount + kitUnit * kitCount;
     return total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  }, [unitPrice, childPrice, breakfastKitPrice, breakfastKitSelections, adultsCount, childrenAges, childrenCount]);
+  }, [
+    unitPrice,
+    childPrice,
+    breakfastKitPrice,
+    breakfastKitSelections,
+    adultCourtesySelections,
+    childrenCourtesySelections,
+    adultsCount,
+    childrenAges,
+    childrenCount,
+  ]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -204,9 +229,11 @@ export function PackageReservationForm({
         paymentPreferenceInstallments: paymentPreferenceMethod === "CARTAO" ? paymentPreferenceInstallments : null,
         adultNames,
         adultShirtSizes,
+        adultCourtesySelections,
         childrenNames,
         childrenAges,
         childrenShirtNumbers,
+        childrenCourtesySelections,
         // legado: manter no backend como falso para todos
         breakfastSelections: Array.from({ length: shirtCount }, () => false),
         breakfastKitSelections: breakfastKitAvailable ? breakfastKitSelections : adultShirtSizes.map(() => false),
@@ -404,7 +431,20 @@ export function PackageReservationForm({
                     <div key={`a-${idx}`} className="rounded-md border border-[var(--igh-border)] bg-[var(--card-bg)] p-3">
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-xs text-[var(--igh-muted)]">Adulto #{idx + 1}</div>
-                        <div className="text-xs text-[var(--igh-muted)]">Adulto #{idx + 1}</div>
+                        <label className="flex items-center gap-1 text-xs text-[var(--igh-secondary)]">
+                          <input
+                            type="checkbox"
+                            checked={adultCourtesySelections[idx] ?? false}
+                            onChange={(e) =>
+                              setAdultCourtesySelections((prev) => {
+                                const next = prev.slice();
+                                next[idx] = e.target.checked;
+                                return next;
+                              })
+                            }
+                          />
+                          Cortesia
+                        </label>
                       </div>
                       <div className="mt-2 grid gap-3 sm:grid-cols-2">
                         <div className="sm:col-span-2">
@@ -478,7 +518,23 @@ export function PackageReservationForm({
                   {Array.from({ length: childrenCount }, (_, cidx) => {
                     return (
                       <div key={`c-${cidx}`} className="rounded-md border border-[var(--igh-border)] bg-[var(--card-bg)] p-3">
-                        <div className="text-xs text-[var(--igh-muted)]">Criança #{cidx + 1}</div>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-xs text-[var(--igh-muted)]">Criança #{cidx + 1}</div>
+                          <label className="flex items-center gap-1 text-xs text-[var(--igh-secondary)]">
+                            <input
+                              type="checkbox"
+                              checked={childrenCourtesySelections[cidx] ?? false}
+                              onChange={(e) =>
+                                setChildrenCourtesySelections((prev) => {
+                                  const next = prev.slice();
+                                  next[cidx] = e.target.checked;
+                                  return next;
+                                })
+                              }
+                            />
+                            Cortesia
+                          </label>
+                        </div>
                         <div className="mt-2 grid gap-3 sm:grid-cols-2">
                           <div className="sm:col-span-2">
                             <div className="text-xs text-[var(--igh-muted)]">Nome completo</div>

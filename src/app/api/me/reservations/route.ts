@@ -132,9 +132,11 @@ export async function POST(request: Request) {
   const childrenCount = typeof o.childrenCount === "number" ? o.childrenCount : Number.NaN;
   const adultNames = Array.isArray(o.adultNames) ? o.adultNames : [];
   const adultShirtSizes = Array.isArray(o.adultShirtSizes) ? o.adultShirtSizes : [];
+  const adultCourtesySelections = Array.isArray(o.adultCourtesySelections) ? o.adultCourtesySelections : [];
   const childrenNames = Array.isArray(o.childrenNames) ? o.childrenNames : [];
   const childrenAges = Array.isArray(o.childrenAges) ? o.childrenAges : [];
   const childrenShirtNumbers = Array.isArray(o.childrenShirtNumbers) ? o.childrenShirtNumbers : [];
+  const childrenCourtesySelections = Array.isArray(o.childrenCourtesySelections) ? o.childrenCourtesySelections : [];
   const breakfastSelections = Array.isArray(o.breakfastSelections) ? o.breakfastSelections : [];
   const breakfastKitSelections = Array.isArray(o.breakfastKitSelections) ? o.breakfastKitSelections : [];
   const paymentPreferenceMethod =
@@ -162,9 +164,11 @@ export async function POST(request: Request) {
       childrenCount,
       adultNames: adultNames.map((s) => String(s ?? "")),
       adultShirtSizes: adultShirtSizes.map((s) => String(s ?? "")),
+      adultCourtesySelections: adultCourtesySelections.map((v) => Boolean(v)),
       childrenNames: childrenNames.map((s) => String(s ?? "")),
       childrenAges: childrenAges.map((n) => (typeof n === "number" ? n : Number(n))),
       childrenShirtNumbers: childrenShirtNumbers.map((n) => (typeof n === "number" ? n : Number(n))),
+      childrenCourtesySelections: childrenCourtesySelections.map((v) => Boolean(v)),
       breakfastSelections: breakfastSelections.map((v) => Boolean(v)),
       breakfastKitSelections: breakfastKitSelections.map((v) => Boolean(v)),
       paymentPreferenceMethod,

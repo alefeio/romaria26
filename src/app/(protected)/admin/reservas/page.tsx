@@ -215,11 +215,6 @@ export default function AdminReservasPage() {
                   <Badge tone={toneForStatus(r.status)}>{statusLabel[r.status] ?? r.status}</Badge>
                 </Td>
                 <Td className="text-right">
-                  <Link href={`/admin/reservas/${r.id}/pagamentos`} className="mr-2 inline-block">
-                    <Button type="button" variant="secondary" size="sm" className="mb-1">
-                      Pagamentos
-                    </Button>
-                  </Link>
                   <div className="inline-block text-left">
                     <Button
                       type="button"
@@ -257,6 +252,13 @@ export default function AdminReservasPage() {
                             onClick={() => closeMenu()}
                           >
                             Detalhes
+                          </Link>
+                          <Link
+                            href={`/admin/reservas/${r.id}/pagamentos`}
+                            className="block px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--igh-surface)]"
+                            onClick={() => closeMenu()}
+                          >
+                            Pagamentos
                           </Link>
                           {r.status !== "CONFIRMED" ? (
                             <button
