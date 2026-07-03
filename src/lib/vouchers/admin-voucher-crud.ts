@@ -97,7 +97,7 @@ export async function createReservationVoucherAdmin(
   if (clash) return { err: "INDEX_IN_USE" as const };
 
   const range = rangeFor(personType, hasBreakfastKit);
-  const codeNumber = await allocateNextVoucherNumber(tx, reservation.packageId, range);
+  const codeNumber = await allocateNextVoucherNumber(tx, range);
   const code = formatVoucherCode(codeNumber);
 
   const row = await tx.reservationVoucher.create({
@@ -165,7 +165,7 @@ export async function updateReservationVoucherAdmin(
 
   if (rangeChanged) {
     const range = rangeFor(personType, hasBreakfastKit);
-    codeNumber = await allocateNextVoucherNumber(tx, existing.packageId, range);
+    codeNumber = await allocateNextVoucherNumber(tx, range);
     code = formatVoucherCode(codeNumber);
   }
 

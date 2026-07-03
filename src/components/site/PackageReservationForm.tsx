@@ -251,9 +251,19 @@ export function PackageReservationForm({
           isAdminForCustomer ? { userId: adminForUserId, ...basePayload } : basePayload
         ),
       });
-      const json = (await res.json()) as
-        | { ok: true; data: { reservation: { id: string }; whatsappUrl?: string } }
-        | { ok: false; error: { message: string } };
+      const raw = await res.text();
+      type ReservationOk = { ok: true; data: { reservation: { id: string }; whatsappUrl?: string } };
+      type ReservationErr = { ok: false; error: { message: string } };
+      let json: ReservationOk | ReservationErr;
+      try {
+        json = raw ? (JSON.parse(raw) as ReservationOk | ReservationErr) : { ok: false, error: { message: "Resposta vazia do servidor." } };
+      } catch {
+        setMessage({
+          type: "err",
+          text: res.ok ? "Resposta inválida do servidor." : `Erro do servidor (${res.status}). Tente novamente.`,
+        });
+        return;
+      }
       if (!res.ok || !json.ok) {
         setMessage({ type: "err", text: !json.ok ? json.error.message : "Não foi possível reservar." });
         return;

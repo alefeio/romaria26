@@ -20,13 +20,16 @@ export function formatVoucherCode(n: number): string {
 
 type TxClient = Parameters<typeof prisma.$transaction>[0] extends (arg: infer T) => any ? T : never;
 
+/**
+ * Próximo número sequencial na faixa, global (todos os lotes/pacotes).
+ * O campo `code` é único no banco; numeração reiniciada por pacote geraria colisão (ex.: 0001 no lote 2).
+ */
 export async function allocateNextVoucherNumber(
   tx: TxClient,
-  packageId: string,
   range: { from: number; to: number }
 ): Promise<number> {
   const maxRow = await tx.reservationVoucher.aggregate({
-    where: { packageId, codeNumber: { gte: range.from, lte: range.to } },
+    where: { codeNumber: { gte: range.from, lte: range.to } },
     _max: { codeNumber: true },
   });
   const next = (maxRow._max.codeNumber ?? range.from - 1) + 1;
@@ -108,7 +111,7 @@ export async function ensureReservationVouchersTx(tx: TxClient, reservationId: s
             ? VOUCHER_RANGES.ADULT_WITH_KIT
             : VOUCHER_RANGES.ADULT_NO_KIT;
 
-      const codeNumber = await allocateNextVoucherNumber(tx, reservation.packageId, range);
+      const codeNumber = await allocateNextVoucherNumber(tx, range);
       const code = formatVoucherCode(codeNumber);
 
       await tx.reservationVoucher.create({

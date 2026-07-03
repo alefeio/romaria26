@@ -5,8 +5,8 @@ import { getSessionUserFromCookie } from "@/lib/auth";
 import { jsonErr, jsonOk } from "@/lib/http";
 import {
   createReservationInTransaction,
-  ReservationCreateError,
 } from "@/lib/reservations/create-reservation";
+import { reservationRouteErrorResponse } from "@/lib/reservations/route-errors";
 import { sendEmailAndRecord } from "@/lib/email/send-and-record";
 import { getEmailBranding, wrapBrandedEmail } from "@/lib/email/branding";
 
@@ -289,17 +289,6 @@ export async function POST(request: Request) {
 
     return jsonOk({ reservation, whatsappUrl: whatsappUrl ?? undefined }, { status: 201 });
   } catch (e) {
-    if (e instanceof ReservationCreateError) {
-      const status =
-        e.code === "INSUFFICIENT_CAPACITY"
-          ? 409
-          : e.code === "BREAKFAST_NOT_ALLOWED"
-            ? 422
-            : e.code === "PACKAGE_UNAVAILABLE"
-              ? 404
-              : 400;
-      return jsonErr(e.code, e.message, status);
-    }
-    throw e;
+    return reservationRouteErrorResponse(e, "POST /api/me/reservations");
   }
 }
