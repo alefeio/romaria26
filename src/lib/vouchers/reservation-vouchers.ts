@@ -172,19 +172,38 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
     return { ok: false as const, reason: "NO_CUSTOMER_EMAIL" as const };
   }
 
-  const [alreadyCustomer, alreadyAdmin] = await Promise.all([
+  const ensured = await ensureReservationVouchers(reservationId);
+  if (!ensured) return { ok: false as const, reason: "NOT_FOUND" as const };
+
+  const newestVoucherAt = ensured.vouchers.reduce<Date | null>((max, v) => {
+    if (!max || v.createdAt > max) return v.createdAt;
+    return max;
+  }, null);
+
+  const [lastCustomerEmail, lastAdminEmail] = await Promise.all([
     prisma.sentEmail.findFirst({
       where: { emailType: "RESERVATION_VOUCHERS_CUSTOMER", entityType: "Reservation", entityId: reservationId },
-      select: { id: true },
+      orderBy: { sentAt: "desc" },
+      select: { id: true, sentAt: true },
     }),
     prisma.sentEmail.findFirst({
       where: { emailType: "RESERVATION_VOUCHERS_ADMIN", entityType: "Reservation", entityId: reservationId },
-      select: { id: true },
+      orderBy: { sentAt: "desc" },
+      select: { id: true, sentAt: true },
     }),
   ]);
 
-  const ensured = await ensureReservationVouchers(reservationId);
-  if (!ensured) return { ok: false as const, reason: "NOT_FOUND" as const };
+  /** Já enviou e-mail cobrindo o conjunto atual de vouchers (nenhum voucher novo desde o último envio). */
+  const customerAlreadyUpToDate = Boolean(
+    lastCustomerEmail && newestVoucherAt && lastCustomerEmail.sentAt >= newestVoucherAt
+  );
+  const adminAlreadyUpToDate = Boolean(
+    lastAdminEmail && newestVoucherAt && lastAdminEmail.sentAt >= newestVoucherAt
+  );
+
+  if (customerAlreadyUpToDate && adminAlreadyUpToDate) {
+    return { ok: true as const, skipped: true };
+  }
 
   const adminUsers = await prisma.user.findMany({
     where: { isActive: true, OR: [{ role: { in: ["MASTER", "ADMIN"] } }, { isAdmin: true }] },
@@ -261,7 +280,10 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
     })
     .join("");
 
-  const subject = `Ingressos (QR Code) — ${reservation.package.name}`;
+  const isResend = Boolean(lastCustomerEmail || lastAdminEmail);
+  const subject = isResend
+    ? `Ingressos atualizados (QR Code) — ${reservation.package.name}`
+    : `Ingressos (QR Code) — ${reservation.package.name}`;
   const bodyCore = `
   <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color:#111">
     <h2 style="margin:0 0 8px 0">Seus vouchers (ingressos) — ${escapeHtml(reservation.package.name)}</h2>
@@ -270,6 +292,7 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
       <div><strong>Passeio:</strong> ${escapeHtml(when)}</div>
       <div><strong>Embarque:</strong> ${escapeHtml(reservation.package.boardingLocation)}</div>
       <div style="margin-top:8px">Apresente o QR Code abaixo na entrada.</div>
+      ${isResend ? `<div style="margin-top:8px;color:#6b7280;">Este e-mail inclui todos os ingressos da reserva (incluindo os adicionados após o pagamento anterior).</div>` : ""}
     </div>
     ${vouchersHtml}
   </div>
@@ -287,7 +310,7 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
   });
 
   await Promise.allSettled([
-    alreadyCustomer
+    customerAlreadyUpToDate
       ? Promise.resolve()
       : sendEmailAndRecord({
           to: customerEmail,
@@ -299,7 +322,7 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
           entityId: reservationId,
           performedByUserId: performedByUserId ?? null,
         }),
-    !adminTo.length || alreadyAdmin
+    !adminTo.length || adminAlreadyUpToDate
       ? Promise.resolve()
       : sendEmailAndRecord({
           to: adminTo,
@@ -313,7 +336,7 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
         }),
   ]);
 
-  return { ok: true as const, skipped: Boolean(alreadyCustomer && alreadyAdmin) };
+  return { ok: true as const, skipped: Boolean(customerAlreadyUpToDate && adminAlreadyUpToDate) };
 }
 
 function escapeHtml(s: string): string {
