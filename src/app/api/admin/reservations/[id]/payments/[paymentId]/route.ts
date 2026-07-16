@@ -2,7 +2,7 @@ import type { PaymentMethod, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminApi } from "@/lib/api-admin-guard";
 import { jsonErr, jsonOk } from "@/lib/http";
-import { recalcReservationPaymentStatus, type ReservationDbClient } from "@/lib/payments/reservation-payments";
+import { recalcReservationPaymentStatus } from "@/lib/payments/reservation-payments";
 import { createAuditLog } from "@/lib/audit";
 
 function isUuid(id: string): boolean {
@@ -18,35 +18,40 @@ function parseAuditDiff(diffJson: string): Record<string, unknown> {
   }
 }
 
-/** Se o pagamento liquidou uma parcela, volta a parcela para agendada. */
-async function revertInstallmentLinkedToPayment(
-  tx: ReservationDbClient,
+/**
+ * Descobre a parcela ligada ao pagamento (fora da transação de exclusão).
+ * Não deve ser chamado dentro de um $transaction se puder falhar — no Postgres,
+ * um erro aborta todo o bloco e gera "current transaction is aborted".
+ */
+async function findInstallmentIdLinkedToPayment(
   reservationId: string,
   paymentId: string,
-  payment: { amount: Prisma.Decimal; paidAt: Date; method: PaymentMethod }
-) {
-  const logs = await tx.auditLog.findMany({
-    where: {
-      entityType: "Reservation",
-      entityId: reservationId,
-      action: "RESERVATION_INSTALLMENT_PAID_VIA_PAYMENT",
-    },
-    orderBy: { createdAt: "desc" },
-    take: 80,
-  });
+  payment: { amount: Prisma.Decimal; method: PaymentMethod }
+): Promise<string | null> {
+  try {
+    const logs = await prisma.auditLog.findMany({
+      where: {
+        entityType: "Reservation",
+        entityId: reservationId,
+        action: "RESERVATION_INSTALLMENT_PAID_VIA_PAYMENT",
+      },
+      orderBy: { createdAt: "desc" },
+      take: 80,
+      select: { diffJson: true },
+    });
 
-  let installmentId: string | null = null;
-  for (const log of logs) {
-    const diff = parseAuditDiff(log.diffJson);
-    if (diff.paymentId === paymentId && typeof diff.installmentId === "string") {
-      installmentId = diff.installmentId;
-      break;
+    for (const log of logs) {
+      const diff = parseAuditDiff(log.diffJson);
+      if (diff.paymentId === paymentId && typeof diff.installmentId === "string" && isUuid(diff.installmentId)) {
+        return diff.installmentId;
+      }
     }
+  } catch (e) {
+    console.error("[DELETE payment] leitura de audit para parcela vinculada", e);
   }
 
-  if (!installmentId) {
-    // Fallback: parcela paga com mesmo valor/método (sem exigir igualdade exata de timestamp).
-    const match = await tx.reservationInstallment.findFirst({
+  try {
+    const match = await prisma.reservationInstallment.findFirst({
       where: {
         reservationId,
         status: "PAID",
@@ -56,25 +61,11 @@ async function revertInstallmentLinkedToPayment(
       orderBy: { paidAt: "desc" },
       select: { id: true },
     });
-    installmentId = match?.id ?? null;
+    return match?.id ?? null;
+  } catch (e) {
+    console.error("[DELETE payment] fallback de parcela vinculada", e);
+    return null;
   }
-
-  if (!installmentId) return;
-
-  const inst = await tx.reservationInstallment.findFirst({
-    where: { id: installmentId, reservationId },
-    select: { id: true, status: true },
-  });
-  if (!inst || inst.status !== "PAID") return;
-
-  await tx.reservationInstallment.update({
-    where: { id: installmentId },
-    data: {
-      status: "SCHEDULED",
-      paidAt: null,
-      method: null,
-    },
-  });
 }
 
 export async function DELETE(
@@ -88,56 +79,67 @@ export async function DELETE(
   if (!isUuid(id) || !isUuid(paymentId)) return jsonErr("INVALID_ID", "ID inválido.", 400);
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      const payment = await tx.reservationPayment.findFirst({
-        where: { id: paymentId, reservationId: id },
-      });
-      if (!payment) return { err: "NOT_FOUND" as const };
-
-      try {
-        await revertInstallmentLinkedToPayment(tx, id, paymentId, payment);
-      } catch (e) {
-        console.error("[DELETE payment] falha ao reverter parcela vinculada (seguindo com exclusão)", e);
-      }
-
-      await tx.reservationPayment.delete({ where: { id: paymentId } });
-
-      const updated = await recalcReservationPaymentStatus(tx, id);
-
-      return {
-        ok: true as const,
-        payment,
-        updated,
-      };
+    const payment = await prisma.reservationPayment.findFirst({
+      where: { id: paymentId, reservationId: id },
     });
-
-    if ("err" in result) {
+    if (!payment) {
       return jsonErr("NOT_FOUND", "Pagamento não encontrado nesta reserva.", 404);
     }
 
-    // Fora da transação: evita misturar o client global com a conexão da interactive transaction.
+    // Resolver parcela ANTES da exclusão, fora da interactive transaction.
+    const installmentId = await findInstallmentIdLinkedToPayment(id, paymentId, payment);
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const stillThere = await tx.reservationPayment.findFirst({
+        where: { id: paymentId, reservationId: id },
+        select: { id: true },
+      });
+      if (!stillThere) return null;
+
+      await tx.reservationPayment.delete({ where: { id: paymentId } });
+      return recalcReservationPaymentStatus(tx, id);
+    });
+
+    if (!updated) {
+      return jsonErr("NOT_FOUND", "Pagamento não encontrado nesta reserva.", 404);
+    }
+
+    if (installmentId) {
+      try {
+        await prisma.reservationInstallment.updateMany({
+          where: { id: installmentId, reservationId: id, status: "PAID" },
+          data: {
+            status: "SCHEDULED",
+            paidAt: null,
+            method: null,
+          },
+        });
+      } catch (e) {
+        console.error("[DELETE payment] não foi possível reabrir a parcela vinculada", e);
+      }
+    }
+
     await createAuditLog({
       entityType: "Reservation",
       entityId: id,
       action: "RESERVATION_PAYMENT_DELETED",
       diff: {
         paymentId,
-        amount: result.payment.amount.toString(),
-        paidAt: result.payment.paidAt.toISOString(),
-        method: result.payment.method,
-        paymentStatus: result.updated?.paymentStatus ?? null,
+        amount: payment.amount.toString(),
+        paidAt: payment.paidAt.toISOString(),
+        method: payment.method,
+        installmentId,
+        paymentStatus: updated.paymentStatus,
       },
       performedByUserId: auth.id,
     }).catch((e) => console.error("[DELETE payment] audit log falhou", e));
 
     return jsonOk({
-      reservation: result.updated
-        ? {
-            id: result.updated.id,
-            paymentStatus: result.updated.paymentStatus,
-            totalPaid: result.updated.totalPaid.toString(),
-          }
-        : null,
+      reservation: {
+        id: updated.id,
+        paymentStatus: updated.paymentStatus,
+        totalPaid: updated.totalPaid.toString(),
+      },
     });
   } catch (e) {
     console.error("[DELETE payment]", e);
