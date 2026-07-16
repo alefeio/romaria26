@@ -241,9 +241,18 @@ export default function AdminReservaPagamentosPage() {
     setActingPaymentId(paymentId);
     try {
       const res = await fetch(`/api/admin/reservations/${id}/payments/${paymentId}`, { method: "DELETE" });
-      const json = (await res.json()) as ApiResponse<unknown>;
+      const raw = await res.text();
+      let json: ApiResponse<unknown>;
+      try {
+        json = raw
+          ? (JSON.parse(raw) as ApiResponse<unknown>)
+          : { ok: false, error: { code: "EMPTY", message: "Resposta vazia do servidor." } };
+      } catch {
+        toast.push("error", `Erro do servidor ao excluir (${res.status}). Tente novamente.`);
+        return;
+      }
       if (!res.ok || !json.ok) {
-        toast.push("error", !json.ok ? (json as { ok: false; error: { message: string } }).error.message : "Falha ao excluir pagamento.");
+        toast.push("error", !json.ok ? json.error.message : "Falha ao excluir pagamento.");
         return;
       }
       toast.push("success", "Pagamento excluído.");

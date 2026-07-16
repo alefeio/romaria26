@@ -141,43 +141,46 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
           receiptUrl: d.receiptUrl?.trim() || null,
         },
       });
-      await createAuditLog({
-        entityType: "Reservation",
-        entityId: id,
-        action: "RESERVATION_INSTALLMENT_PAID_VIA_PAYMENT",
-        diff: {
-          installmentId: d.installmentId,
-          dueDate: installmentDueYmd,
-          paymentId: payment.id,
-          amount: d.amount,
-          paidAt: paidAt.toISOString(),
-          method: d.method,
-        },
-        performedByUserId: auth.id,
-      });
     }
 
     const updated = await recalcReservationPaymentStatus(tx, id);
 
-    await createAuditLog({
-      entityType: "Reservation",
-      entityId: id,
-      action: "RESERVATION_PAYMENT_CREATED",
-      diff: {
-        amount: d.amount,
-        paidAt: paidAt.toISOString(),
-        method: d.method,
-        paymentId: payment.id,
-        installmentId: d.installmentId ?? null,
-        paymentStatus: updated?.paymentStatus,
-      },
-      performedByUserId: auth.id,
-    });
-
-    return { payment, updated };
+    return { payment, updated, installmentId: d.installmentId ?? null, installmentDueYmd };
   });
 
   if (!result) return jsonErr("NOT_FOUND", "Reserva não encontrada.", 404);
+
+  if (result.installmentId && result.installmentDueYmd) {
+    await createAuditLog({
+      entityType: "Reservation",
+      entityId: id,
+      action: "RESERVATION_INSTALLMENT_PAID_VIA_PAYMENT",
+      diff: {
+        installmentId: result.installmentId,
+        dueDate: result.installmentDueYmd,
+        paymentId: result.payment.id,
+        amount: d.amount,
+        paidAt: paidAt.toISOString(),
+        method: d.method,
+      },
+      performedByUserId: auth.id,
+    }).catch((e) => console.error("[POST payment] audit installment", e));
+  }
+
+  await createAuditLog({
+    entityType: "Reservation",
+    entityId: id,
+    action: "RESERVATION_PAYMENT_CREATED",
+    diff: {
+      amount: d.amount,
+      paidAt: paidAt.toISOString(),
+      method: d.method,
+      paymentId: result.payment.id,
+      installmentId: result.installmentId,
+      paymentStatus: result.updated?.paymentStatus,
+    },
+    performedByUserId: auth.id,
+  }).catch((e) => console.error("[POST payment] audit create", e));
 
   // Se este pagamento quitou 100%, gera vouchers e envia ao cliente (idempotente).
   if (result.updated?.paymentStatus === "PAID") {

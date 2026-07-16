@@ -32,7 +32,7 @@ async function revertInstallmentLinkedToPayment(
       action: "RESERVATION_INSTALLMENT_PAID_VIA_PAYMENT",
     },
     orderBy: { createdAt: "desc" },
-    take: 50,
+    take: 80,
   });
 
   let installmentId: string | null = null;
@@ -45,14 +45,15 @@ async function revertInstallmentLinkedToPayment(
   }
 
   if (!installmentId) {
+    // Fallback: parcela paga com mesmo valor/método (sem exigir igualdade exata de timestamp).
     const match = await tx.reservationInstallment.findFirst({
       where: {
         reservationId,
         status: "PAID",
         amount: payment.amount,
-        paidAt: payment.paidAt,
         method: payment.method,
       },
+      orderBy: { paidAt: "desc" },
       select: { id: true },
     });
     installmentId = match?.id ?? null;
@@ -71,6 +72,7 @@ async function revertInstallmentLinkedToPayment(
     data: {
       status: "SCHEDULED",
       paidAt: null,
+      method: null,
     },
   });
 }
@@ -85,46 +87,61 @@ export async function DELETE(
   const { id, paymentId } = await ctx.params;
   if (!isUuid(id) || !isUuid(paymentId)) return jsonErr("INVALID_ID", "ID inválido.", 400);
 
-  const result = await prisma.$transaction(async (tx) => {
-    const payment = await tx.reservationPayment.findFirst({
-      where: { id: paymentId, reservationId: id },
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const payment = await tx.reservationPayment.findFirst({
+        where: { id: paymentId, reservationId: id },
+      });
+      if (!payment) return { err: "NOT_FOUND" as const };
+
+      try {
+        await revertInstallmentLinkedToPayment(tx, id, paymentId, payment);
+      } catch (e) {
+        console.error("[DELETE payment] falha ao reverter parcela vinculada (seguindo com exclusão)", e);
+      }
+
+      await tx.reservationPayment.delete({ where: { id: paymentId } });
+
+      const updated = await recalcReservationPaymentStatus(tx, id);
+
+      return {
+        ok: true as const,
+        payment,
+        updated,
+      };
     });
-    if (!payment) return { err: "NOT_FOUND" as const };
 
-    await revertInstallmentLinkedToPayment(tx, id, paymentId, payment);
+    if ("err" in result) {
+      return jsonErr("NOT_FOUND", "Pagamento não encontrado nesta reserva.", 404);
+    }
 
-    await tx.reservationPayment.delete({ where: { id: paymentId } });
-
-    const updated = await recalcReservationPaymentStatus(tx, id);
-
+    // Fora da transação: evita misturar o client global com a conexão da interactive transaction.
     await createAuditLog({
       entityType: "Reservation",
       entityId: id,
       action: "RESERVATION_PAYMENT_DELETED",
       diff: {
         paymentId,
-        amount: payment.amount.toString(),
-        paidAt: payment.paidAt.toISOString(),
-        method: payment.method,
-        paymentStatus: updated?.paymentStatus,
+        amount: result.payment.amount.toString(),
+        paidAt: result.payment.paidAt.toISOString(),
+        method: result.payment.method,
+        paymentStatus: result.updated?.paymentStatus ?? null,
       },
       performedByUserId: auth.id,
+    }).catch((e) => console.error("[DELETE payment] audit log falhou", e));
+
+    return jsonOk({
+      reservation: result.updated
+        ? {
+            id: result.updated.id,
+            paymentStatus: result.updated.paymentStatus,
+            totalPaid: result.updated.totalPaid.toString(),
+          }
+        : null,
     });
-
-    return { ok: updated };
-  });
-
-  if ("err" in result && result.err === "NOT_FOUND") {
-    return jsonErr("NOT_FOUND", "Pagamento não encontrado nesta reserva.", 404);
+  } catch (e) {
+    console.error("[DELETE payment]", e);
+    const msg = e instanceof Error ? e.message : "Falha ao excluir pagamento.";
+    return jsonErr("DELETE_FAILED", msg, 500);
   }
-
-  return jsonOk({
-    reservation: result.ok
-      ? {
-          id: result.ok.id,
-          paymentStatus: result.ok.paymentStatus,
-          totalPaid: result.ok.totalPaid.toString(),
-        }
-      : null,
-  });
 }
