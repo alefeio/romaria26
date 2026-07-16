@@ -12,15 +12,33 @@ export function AdminSendVoucherButton({ code }: { code: string }) {
 
   async function onClick() {
     if (!code || loading) return;
+    if (
+      !window.confirm(
+        "Enviar por e-mail todos os vouchers desta reserva para o cliente? Se já tiver sido enviado antes, será reenviado."
+      )
+    ) {
+      return;
+    }
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/vouchers/${encodeURIComponent(code)}/send-customer`, { method: "POST" });
-      const json = (await res.json()) as ApiResponse<{ ok: true; skipped?: boolean }>;
+      const res = await fetch(`/api/admin/vouchers/${encodeURIComponent(code)}/send-customer`, {
+        method: "POST",
+      });
+      const raw = await res.text();
+      let json: ApiResponse<{ ok: true; skipped?: boolean }>;
+      try {
+        json = raw
+          ? (JSON.parse(raw) as ApiResponse<{ ok: true; skipped?: boolean }>)
+          : { ok: false, error: { code: "EMPTY", message: "Resposta vazia do servidor." } };
+      } catch {
+        toast.push("error", `Erro do servidor ao enviar (${res.status}).`);
+        return;
+      }
       if (!res.ok || !json.ok) {
         toast.push("error", !json.ok ? json.error.message : "Falha ao enviar e-mail.");
         return;
       }
-      toast.push("success", json.data.skipped ? "E-mail já tinha sido enviado (sem reenvio)." : "E-mail enviado para o cliente.");
+      toast.push("success", "E-mail com todos os vouchers enviado para o cliente.");
     } finally {
       setLoading(false);
     }
@@ -32,4 +50,3 @@ export function AdminSendVoucherButton({ code }: { code: string }) {
     </Button>
   );
 }
-

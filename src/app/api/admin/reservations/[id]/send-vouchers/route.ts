@@ -6,7 +6,9 @@ import { jsonErr, jsonOk } from "@/lib/http";
 import { sendReservationVouchersIfPaid } from "@/lib/vouchers/reservation-vouchers";
 import { createAuditLog } from "@/lib/audit";
 
-type Ctx = { params: Promise<{ code: string }> };
+function isUuid(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+}
 
 function sendFailureMessage(reason: string, error?: string): string {
   if (reason === "NOT_PAID") return "A reserva ainda não está 100% paga.";
@@ -16,22 +18,21 @@ function sendFailureMessage(reason: string, error?: string): string {
   return "Não foi possível enviar.";
 }
 
-/** Admin: reenvio forçado dos vouchers da reserva deste código. */
-export async function POST(_request: Request, ctx: Ctx) {
+/** Admin: envia (ou reenvia) todos os vouchers da reserva ao e-mail do cliente. */
+export async function POST(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAdminApi();
   if (auth instanceof Response) return auth;
 
-  const { code } = await ctx.params;
-  const c = decodeURIComponent(code ?? "").trim();
-  if (!c) return jsonErr("INVALID_CODE", "Código inválido.", 400);
+  const { id } = await ctx.params;
+  if (!isUuid(id)) return jsonErr("INVALID_ID", "ID inválido.", 400);
 
-  const v = await prisma.reservationVoucher.findFirst({
-    where: { code: c },
-    select: { reservationId: true },
+  const reservation = await prisma.reservation.findUnique({
+    where: { id },
+    select: { id: true },
   });
-  if (!v) return jsonErr("NOT_FOUND", "Voucher não encontrado.", 404);
+  if (!reservation) return jsonErr("NOT_FOUND", "Reserva não encontrada.", 404);
 
-  const result = await sendReservationVouchersIfPaid(v.reservationId, auth.id, { force: true });
+  const result = await sendReservationVouchersIfPaid(id, auth.id, { force: true });
   if (!result.ok) {
     return jsonErr(
       "CANNOT_SEND",
@@ -42,11 +43,11 @@ export async function POST(_request: Request, ctx: Ctx) {
 
   await createAuditLog({
     entityType: "Reservation",
-    entityId: v.reservationId,
+    entityId: id,
     action: "RESERVATION_VOUCHERS_EMAIL_FORCED",
-    diff: { via: "voucher_page", code: c },
+    diff: { via: "reservation_page" },
     performedByUserId: auth.id,
   }).catch(() => null);
 
-  return jsonOk({ ok: true, skipped: false });
+  return jsonOk({ ok: true });
 }

@@ -70,6 +70,7 @@ export function ReservationVouchersManager({ reservationId, adultsCount, childre
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<VoucherItem | null>(null);
   const [saving, setSaving] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
 
   const reload = useCallback(async () => {
@@ -87,6 +88,38 @@ export function ReservationVouchersManager({ reservationId, adultsCount, childre
     }
     router.refresh();
   }, [reservationId, router]);
+
+  async function sendAllVouchersEmail() {
+    if (sendingEmail || vouchers.length === 0) return;
+    if (
+      !window.confirm(
+        "Enviar por e-mail todos os vouchers desta reserva para o cliente? Se já tiver sido enviado antes, será reenviado."
+      )
+    ) {
+      return;
+    }
+    setSendingEmail(true);
+    try {
+      const res = await fetch(`/api/admin/reservations/${reservationId}/send-vouchers`, { method: "POST" });
+      const raw = await res.text();
+      let json: ApiResponse<{ ok: true }>;
+      try {
+        json = raw
+          ? (JSON.parse(raw) as ApiResponse<{ ok: true }>)
+          : { ok: false, error: { code: "EMPTY", message: "Resposta vazia do servidor." } };
+      } catch {
+        toast.push("error", `Erro do servidor ao enviar (${res.status}).`);
+        return;
+      }
+      if (!res.ok || !json.ok) {
+        toast.push("error", !json.ok ? json.error.message : "Falha ao enviar e-mail.");
+        return;
+      }
+      toast.push("success", "E-mail com todos os vouchers enviado para o cliente.");
+    } finally {
+      setSendingEmail(false);
+    }
+  }
 
   function openCreate() {
     setEditing(null);
@@ -196,9 +229,20 @@ export function ReservationVouchersManager({ reservationId, adultsCount, childre
     <div className="mt-6 card">
       <div className="card-header flex flex-wrap items-center justify-between gap-2">
         <span>Ingressos / Vouchers</span>
-        <Button type="button" size="sm" onClick={openCreate}>
-          Novo voucher
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={sendingEmail || vouchers.length === 0}
+            onClick={() => void sendAllVouchersEmail()}
+          >
+            {sendingEmail ? "Enviando…" : "Enviar vouchers por e-mail"}
+          </Button>
+          <Button type="button" size="sm" onClick={openCreate}>
+            Novo voucher
+          </Button>
+        </div>
       </div>
       <div className="card-body">
         <p className="mb-3 text-xs text-[var(--text-muted)]">

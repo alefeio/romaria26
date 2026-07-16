@@ -151,7 +151,12 @@ function dataUrlToBase64(dataUrl: string): string {
   return i >= 0 ? dataUrl.slice(i + "base64,".length) : dataUrl;
 }
 
-export async function sendReservationVouchersIfPaid(reservationId: string, performedByUserId?: string | null) {
+export async function sendReservationVouchersIfPaid(
+  reservationId: string,
+  performedByUserId?: string | null,
+  opts?: { force?: boolean }
+) {
+  const force = Boolean(opts?.force);
   const reservation = await prisma.reservation.findUnique({
     where: { id: reservationId },
     select: {
@@ -174,6 +179,9 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
 
   const ensured = await ensureReservationVouchers(reservationId);
   if (!ensured) return { ok: false as const, reason: "NOT_FOUND" as const };
+  if (ensured.vouchers.length === 0) {
+    return { ok: false as const, reason: "NO_VOUCHERS" as const };
+  }
 
   const newestVoucherAt = ensured.vouchers.reduce<Date | null>((max, v) => {
     if (!max || v.createdAt > max) return v.createdAt;
@@ -193,13 +201,13 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
     }),
   ]);
 
-  /** Já enviou e-mail cobrindo o conjunto atual de vouchers (nenhum voucher novo desde o último envio). */
-  const customerAlreadyUpToDate = Boolean(
-    lastCustomerEmail && newestVoucherAt && lastCustomerEmail.sentAt >= newestVoucherAt
-  );
-  const adminAlreadyUpToDate = Boolean(
-    lastAdminEmail && newestVoucherAt && lastAdminEmail.sentAt >= newestVoucherAt
-  );
+  /** Já enviou e-mail cobrindo o conjunto atual (ignorado quando `force` — botão manual do admin). */
+  const customerAlreadyUpToDate =
+    !force &&
+    Boolean(lastCustomerEmail && newestVoucherAt && lastCustomerEmail.sentAt >= newestVoucherAt);
+  const adminAlreadyUpToDate =
+    !force &&
+    Boolean(lastAdminEmail && newestVoucherAt && lastAdminEmail.sentAt >= newestVoucherAt);
 
   if (customerAlreadyUpToDate && adminAlreadyUpToDate) {
     return { ok: true as const, skipped: true };
@@ -280,7 +288,7 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
     })
     .join("");
 
-  const isResend = Boolean(lastCustomerEmail || lastAdminEmail);
+  const isResend = Boolean(lastCustomerEmail || lastAdminEmail) || force;
   const subject = isResend
     ? `Ingressos atualizados (QR Code) — ${reservation.package.name}`
     : `Ingressos (QR Code) — ${reservation.package.name}`;
@@ -292,7 +300,7 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
       <div><strong>Passeio:</strong> ${escapeHtml(when)}</div>
       <div><strong>Embarque:</strong> ${escapeHtml(reservation.package.boardingLocation)}</div>
       <div style="margin-top:8px">Apresente o QR Code abaixo na entrada.</div>
-      ${isResend ? `<div style="margin-top:8px;color:#6b7280;">Este e-mail inclui todos os ingressos da reserva (incluindo os adicionados após o pagamento anterior).</div>` : ""}
+      ${isResend ? `<div style="margin-top:8px;color:#6b7280;">Este e-mail inclui todos os ingressos da reserva.</div>` : ""}
     </div>
     ${vouchersHtml}
   </div>
@@ -309,34 +317,47 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
     bodyHtml: bodyCore,
   });
 
-  await Promise.allSettled([
-    customerAlreadyUpToDate
-      ? Promise.resolve()
-      : sendEmailAndRecord({
-          to: customerEmail,
-          subject,
-          html: customerHtml,
-          attachments,
-          emailType: "RESERVATION_VOUCHERS_CUSTOMER",
-          entityType: "Reservation",
-          entityId: reservationId,
-          performedByUserId: performedByUserId ?? null,
-        }),
-    !adminTo.length || adminAlreadyUpToDate
-      ? Promise.resolve()
-      : sendEmailAndRecord({
-          to: adminTo,
-          subject: `[ADMIN] ${subject}`,
-          html: adminHtml,
-          attachments,
-          emailType: "RESERVATION_VOUCHERS_ADMIN",
-          entityType: "Reservation",
-          entityId: reservationId,
-          performedByUserId: performedByUserId ?? null,
-        }),
-  ]);
+  let customerSendOk = customerAlreadyUpToDate;
+  let customerSendError: string | undefined;
+  if (!customerAlreadyUpToDate) {
+    const customerSend = await sendEmailAndRecord({
+      to: customerEmail,
+      subject,
+      html: customerHtml,
+      attachments,
+      emailType: "RESERVATION_VOUCHERS_CUSTOMER",
+      entityType: "Reservation",
+      entityId: reservationId,
+      performedByUserId: performedByUserId ?? null,
+    });
+    customerSendOk = customerSend.success;
+    customerSendError = customerSend.error;
+  }
 
-  return { ok: true as const, skipped: Boolean(customerAlreadyUpToDate && adminAlreadyUpToDate) };
+  if (!adminTo.length || adminAlreadyUpToDate) {
+    // skip admin
+  } else {
+    await sendEmailAndRecord({
+      to: adminTo,
+      subject: `[ADMIN] ${subject}`,
+      html: adminHtml,
+      attachments,
+      emailType: "RESERVATION_VOUCHERS_ADMIN",
+      entityType: "Reservation",
+      entityId: reservationId,
+      performedByUserId: performedByUserId ?? null,
+    }).catch(() => null);
+  }
+
+  if (!customerSendOk) {
+    return {
+      ok: false as const,
+      reason: "EMAIL_FAILED" as const,
+      error: customerSendError ?? "Falha ao enviar o e-mail ao cliente.",
+    };
+  }
+
+  return { ok: true as const, skipped: false as const, forced: force };
 }
 
 function escapeHtml(s: string): string {
