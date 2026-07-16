@@ -3,6 +3,7 @@ import "server-only";
 import type { VoucherPersonType } from "@/generated/prisma/client";
 import type { ReservationDbClient } from "@/lib/payments/reservation-payments";
 import { VOUCHER_RANGES, allocateNextVoucherNumber, formatVoucherCode } from "@/lib/vouchers/reservation-vouchers";
+import { syncReservationFromVouchers } from "@/lib/vouchers/sync-reservation-from-vouchers";
 
 export type VoucherRow = {
   id: string;
@@ -115,7 +116,9 @@ export async function createReservationVoucherAdmin(
     },
   });
 
-  return { ok: row };
+  const totals = await syncReservationFromVouchers(tx, reservationId);
+
+  return { ok: row, totals };
 }
 
 export async function updateReservationVoucherAdmin(
@@ -188,5 +191,24 @@ export async function updateReservationVoucherAdmin(
     },
   });
 
-  return { ok: row };
+  const totals = await syncReservationFromVouchers(tx, reservationId);
+
+  return { ok: row, totals };
+}
+
+export async function deleteReservationVoucherAdmin(
+  tx: ReservationDbClient,
+  reservationId: string,
+  voucherId: string
+) {
+  const existing = await tx.reservationVoucher.findFirst({
+    where: { id: voucherId, reservationId },
+    select: { id: true, code: true, name: true, usedAt: true },
+  });
+  if (!existing) return { err: "NOT_FOUND" as const };
+
+  await tx.reservationVoucher.delete({ where: { id: voucherId } });
+  const totals = await syncReservationFromVouchers(tx, reservationId);
+
+  return { ok: existing, totals };
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 
 import { useToast } from "@/components/feedback/ToastProvider";
 import { Button } from "@/components/ui/Button";
@@ -53,8 +54,19 @@ const emptyForm = (): FormState => ({
 
 export function ReservationVouchersManager({ reservationId, adultsCount, childrenCount, initialVouchers }: Props) {
   const toast = useToast();
+  const router = useRouter();
   const [vouchers, setVouchers] = useState<VoucherItem[]>(initialVouchers);
+  const [counts, setCounts] = useState({ adultsCount, childrenCount });
   const [actingId, setActingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCounts({ adultsCount, childrenCount });
+  }, [adultsCount, childrenCount]);
+
+  useEffect(() => {
+    setVouchers(initialVouchers);
+  }, [initialVouchers]);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<VoucherItem | null>(null);
   const [saving, setSaving] = useState(false);
@@ -62,9 +74,19 @@ export function ReservationVouchersManager({ reservationId, adultsCount, childre
 
   const reload = useCallback(async () => {
     const res = await fetch(`/api/admin/reservations/${reservationId}/vouchers`);
-    const json = (await res.json()) as ApiResponse<{ vouchers: VoucherItem[] }>;
-    if (res.ok && json.ok) setVouchers(json.data.vouchers);
-  }, [reservationId]);
+    const json = (await res.json()) as ApiResponse<{
+      vouchers: VoucherItem[];
+      reservation: { adultsCount: number; childrenCount: number };
+    }>;
+    if (res.ok && json.ok) {
+      setVouchers(json.data.vouchers);
+      setCounts({
+        adultsCount: json.data.reservation.adultsCount,
+        childrenCount: json.data.reservation.childrenCount,
+      });
+    }
+    router.refresh();
+  }, [reservationId, router]);
 
   function openCreate() {
     setEditing(null);
@@ -132,7 +154,12 @@ export function ReservationVouchersManager({ reservationId, adultsCount, childre
         toast.push("error", !json.ok ? json.error.message : "Falha ao salvar voucher.");
         return;
       }
-      toast.push("success", editing ? "Voucher atualizado." : "Voucher criado.");
+      toast.push(
+        "success",
+        editing
+          ? "Voucher atualizado. Totais da reserva recalculados."
+          : "Voucher criado. Valor incluído nos totais da reserva."
+      );
       setModalOpen(false);
       setEditing(null);
       await reload();
@@ -144,7 +171,7 @@ export function ReservationVouchersManager({ reservationId, adultsCount, childre
   async function deleteVoucher(v: VoucherItem) {
     const warn = v.usedAt
       ? "Este voucher já foi utilizado (check-in). Excluir mesmo assim?"
-      : "Excluir este voucher? Esta ação não pode ser desfeita.";
+      : "Excluir este voucher? O valor será removido dos totais da reserva.";
     if (!window.confirm(warn)) return;
     setActingId(v.id);
     try {
@@ -154,7 +181,7 @@ export function ReservationVouchersManager({ reservationId, adultsCount, childre
         toast.push("error", !json.ok ? json.error.message : "Falha ao excluir voucher.");
         return;
       }
-      toast.push("success", "Voucher excluído.");
+      toast.push("success", "Voucher excluído. Totais da reserva recalculados.");
       await reload();
     } finally {
       setActingId(null);
@@ -175,8 +202,9 @@ export function ReservationVouchersManager({ reservationId, adultsCount, childre
       </div>
       <div className="card-body">
         <p className="mb-3 text-xs text-[var(--text-muted)]">
-          Reserva: {adultsCount} adulto(s), {childrenCount} criança(s). Os códigos são gerados automaticamente por faixa
-          (kit café, sem kit, criança). Vouchers também podem ser gerados ao quitar 100% do pagamento.
+          Reserva: {counts.adultsCount} adulto(s), {counts.childrenCount} criança(s). Ao criar ou remover vouchers, o
+          valor devido é recalculado (adulto/criança ≥ 6 anos + kit café), com os preços da reserva. Códigos por faixa
+          (kit, sem kit, criança).
         </p>
         <Table>
           <thead>

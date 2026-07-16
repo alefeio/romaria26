@@ -3,10 +3,35 @@ import { requireAdminApi } from "@/lib/api-admin-guard";
 import { jsonErr, jsonOk } from "@/lib/http";
 import { adminUpdateVoucherSchema } from "@/lib/validators/vouchers";
 import { createAuditLog } from "@/lib/audit";
-import { serializeVoucher, updateReservationVoucherAdmin } from "@/lib/vouchers/admin-voucher-crud";
+import {
+  deleteReservationVoucherAdmin,
+  serializeVoucher,
+  updateReservationVoucherAdmin,
+} from "@/lib/vouchers/admin-voucher-crud";
 
 function isUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+}
+
+function serializeTotals(totals: {
+  adultsCount: number;
+  childrenCount: number;
+  quantity: number;
+  totalPrice: { toString(): string };
+  totalDue: { toString(): string };
+  totalPaid: { toString(): string };
+  paymentStatus: string;
+} | null | undefined) {
+  if (!totals) return null;
+  return {
+    adultsCount: totals.adultsCount,
+    childrenCount: totals.childrenCount,
+    quantity: totals.quantity,
+    totalPrice: totals.totalPrice.toString(),
+    totalDue: totals.totalDue.toString(),
+    totalPaid: totals.totalPaid.toString(),
+    paymentStatus: totals.paymentStatus,
+  };
 }
 
 export async function PATCH(
@@ -47,7 +72,7 @@ export async function PATCH(
         performedByUserId: auth.id,
       });
 
-      return { ok: updated.ok };
+      return { ok: updated.ok, totals: updated.totals };
     });
 
     if ("err" in result) {
@@ -58,7 +83,7 @@ export async function PATCH(
       return jsonErr("UNKNOWN", "Falha ao atualizar voucher.", 500);
     }
 
-    return jsonOk({ voucher: serializeVoucher(result.ok) });
+    return jsonOk({ voucher: serializeVoucher(result.ok), reservation: serializeTotals(result.totals) });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Falha ao atualizar voucher.";
     if (msg.includes("Faixa de vouchers esgotada")) {
@@ -75,26 +100,29 @@ export async function DELETE(_request: Request, ctx: { params: Promise<{ id: str
   const { id, voucherId } = await ctx.params;
   if (!isUuid(id) || !isUuid(voucherId)) return jsonErr("INVALID_ID", "ID inválido.", 400);
 
-  const existing = await prisma.reservationVoucher.findFirst({
-    where: { id: voucherId, reservationId: id },
-    select: { id: true, code: true, name: true, usedAt: true },
+  const result = await prisma.$transaction(async (tx) => {
+    const deleted = await deleteReservationVoucherAdmin(tx, id, voucherId);
+    if ("err" in deleted) return deleted;
+
+    await createAuditLog({
+      entityType: "Reservation",
+      entityId: id,
+      action: "RESERVATION_VOUCHER_DELETED",
+      diff: {
+        voucherId,
+        code: deleted.ok.code,
+        name: deleted.ok.name,
+        wasUsed: Boolean(deleted.ok.usedAt),
+      },
+      performedByUserId: auth.id,
+    });
+
+    return { ok: deleted.ok, totals: deleted.totals };
   });
-  if (!existing) return jsonErr("NOT_FOUND", "Voucher não encontrado.", 404);
 
-  await prisma.reservationVoucher.delete({ where: { id: voucherId } });
+  if ("err" in result) {
+    return jsonErr("NOT_FOUND", "Voucher não encontrado.", 404);
+  }
 
-  await createAuditLog({
-    entityType: "Reservation",
-    entityId: id,
-    action: "RESERVATION_VOUCHER_DELETED",
-    diff: {
-      voucherId,
-      code: existing.code,
-      name: existing.name,
-      wasUsed: Boolean(existing.usedAt),
-    },
-    performedByUserId: auth.id,
-  });
-
-  return jsonOk({ deleted: true });
+  return jsonOk({ deleted: true, reservation: serializeTotals(result.totals) });
 }

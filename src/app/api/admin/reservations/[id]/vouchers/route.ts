@@ -9,6 +9,27 @@ function isUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
 }
 
+function serializeTotals(totals: {
+  adultsCount: number;
+  childrenCount: number;
+  quantity: number;
+  totalPrice: { toString(): string };
+  totalDue: { toString(): string };
+  totalPaid: { toString(): string };
+  paymentStatus: string;
+} | null | undefined) {
+  if (!totals) return null;
+  return {
+    adultsCount: totals.adultsCount,
+    childrenCount: totals.childrenCount,
+    quantity: totals.quantity,
+    totalPrice: totals.totalPrice.toString(),
+    totalDue: totals.totalDue.toString(),
+    totalPaid: totals.totalPaid.toString(),
+    paymentStatus: totals.paymentStatus,
+  };
+}
+
 export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAdminApi();
   if (auth instanceof Response) return auth;
@@ -24,6 +45,10 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       adultsCount: true,
       childrenCount: true,
       quantity: true,
+      totalPrice: true,
+      totalDue: true,
+      totalPaid: true,
+      paymentStatus: true,
       vouchers: { orderBy: [{ personType: "asc" }, { personIndex: "asc" }] },
     },
   });
@@ -36,6 +61,10 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       adultsCount: reservation.adultsCount,
       childrenCount: reservation.childrenCount,
       quantity: reservation.quantity,
+      totalPrice: reservation.totalPrice.toString(),
+      totalDue: reservation.totalDue.toString(),
+      totalPaid: reservation.totalPaid.toString(),
+      paymentStatus: reservation.paymentStatus,
     },
     vouchers: reservation.vouchers.map(serializeVoucher),
   });
@@ -79,7 +108,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
         performedByUserId: auth.id,
       });
 
-      return { ok: created.ok };
+      return { ok: created.ok, totals: created.totals };
     });
 
     if ("err" in result) {
@@ -90,7 +119,10 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       return jsonErr("UNKNOWN", "Falha ao criar voucher.", 500);
     }
 
-    return jsonOk({ voucher: serializeVoucher(result.ok) }, { status: 201 });
+    return jsonOk(
+      { voucher: serializeVoucher(result.ok), reservation: serializeTotals(result.totals) },
+      { status: 201 }
+    );
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Falha ao criar voucher.";
     if (msg.includes("Faixa de vouchers esgotada")) {
