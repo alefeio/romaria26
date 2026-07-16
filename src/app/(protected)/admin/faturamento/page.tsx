@@ -44,6 +44,7 @@ export default function AdminFaturamentoPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [exporting, setExporting] = useState<"pdf" | "xlsx" | null>(null);
 
   const qs = useMemo(() => {
     const sp = new URLSearchParams();
@@ -52,6 +53,49 @@ export default function AdminFaturamentoPage() {
     const s = sp.toString();
     return s ? `?${s}` : "";
   }, [from, to]);
+
+  async function exportReport(format: "pdf" | "xlsx") {
+    if (exporting) return;
+    setExporting(format);
+    try {
+      const sp = new URLSearchParams();
+      sp.set("format", format);
+      if (from) sp.set("from", from);
+      if (to) sp.set("to", to);
+      const res = await fetch(`/api/admin/billing/export?${sp.toString()}`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        let msg = `Falha ao exportar (${res.status}).`;
+        try {
+          const json = (await res.json()) as ApiResponse<unknown>;
+          if (!json.ok) msg = json.error.message;
+        } catch {
+          /* ignore */
+        }
+        toast.push("error", msg);
+        return;
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") ?? "";
+      const match = /filename="([^"]+)"/i.exec(cd);
+      const filename = match?.[1] ?? `faturamento-vendas.${format === "pdf" ? "pdf" : "xlsx"}`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.push("success", format === "pdf" ? "PDF gerado." : "Excel gerado.");
+    } catch (e) {
+      toast.push("error", e instanceof Error ? e.message : "Falha ao exportar.");
+    } finally {
+      setExporting(null);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,11 +148,32 @@ export default function AdminFaturamentoPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Faturamento</h1>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">Vendas (devido), pagamentos recebidos e parcelas em atraso.</p>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            Vendas (devido), pagamentos recebidos e parcelas em atraso. Use Exportar PDF/Excel para o relatório
+            completo (respeita o filtro de datas).
+          </p>
         </div>
-        <Button type="button" variant="secondary" onClick={() => void load()}>
-          Atualizar
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={Boolean(exporting)}
+            onClick={() => void exportReport("pdf")}
+          >
+            {exporting === "pdf" ? "Gerando PDF…" : "Exportar PDF"}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={Boolean(exporting)}
+            onClick={() => void exportReport("xlsx")}
+          >
+            {exporting === "xlsx" ? "Gerando Excel…" : "Exportar Excel"}
+          </Button>
+          <Button type="button" variant="secondary" onClick={() => void load()}>
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
