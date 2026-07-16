@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const xlsx = buildSalesReportXlsx(data);
+    const xlsx = await buildSalesReportXlsx(data);
     return new Response(new Uint8Array(xlsx), {
       status: 200,
       headers: {
