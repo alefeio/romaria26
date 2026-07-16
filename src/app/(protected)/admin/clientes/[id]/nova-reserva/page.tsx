@@ -35,6 +35,18 @@ function formatYmd(d: string | Date): string {
   return new Date(d).toISOString().slice(0, 10);
 }
 
+function packageStatusLabel(status: string, isActive: boolean): string {
+  const statusMap: Record<string, string> = {
+    OPEN: "Aberto",
+    SOLD_OUT: "Esgotado",
+    CLOSED: "Encerrado",
+    SOON: "Em breve",
+    DRAFT: "Rascunho",
+  };
+  const base = statusMap[status] ?? status;
+  return isActive ? base : `${base} · inativo`;
+}
+
 export default function AdminClienteNovaReservaPage() {
   const toast = useToast();
   const params = useParams();
@@ -48,8 +60,13 @@ export default function AdminClienteNovaReservaPage() {
   const [detail, setDetail] = useState<PackageDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
-  const openPackages = useMemo(
-    () => packages.filter((p) => p.status === "OPEN" && p.isActive).sort((a, b) => formatYmd(a.departureDate).localeCompare(formatYmd(b.departureDate))),
+  const selectablePackages = useMemo(
+    () =>
+      [...packages].sort((a, b) => {
+        const byDate = formatYmd(a.departureDate).localeCompare(formatYmd(b.departureDate));
+        if (byDate !== 0) return byDate;
+        return a.name.localeCompare(b.name, "pt-BR");
+      }),
     [packages]
   );
 
@@ -126,21 +143,24 @@ export default function AdminClienteNovaReservaPage() {
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
             Cliente: <span className="font-medium text-[var(--text-primary)]">{customer.name}</span> · {displayCustomerEmail(customer.email)} · {customer.phone ?? "—"}
           </p>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
+            No painel você pode reservar em qualquer lote (aberto, encerrado, esgotado, inativo etc.).
+          </p>
 
-          {openPackages.length === 0 ? (
-            <p className="mt-6 text-[var(--text-secondary)]">Não há pacotes abertos e ativos no momento.</p>
+          {selectablePackages.length === 0 ? (
+            <p className="mt-6 text-[var(--text-secondary)]">Não há pacotes cadastrados.</p>
           ) : (
             <div className="mt-6 max-w-lg">
-              <label className="text-sm font-medium text-[var(--text-primary)]">Passeio</label>
+              <label className="text-sm font-medium text-[var(--text-primary)]">Passeio / lote</label>
               <select
                 className="mt-1 w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm"
                 value={selectedId}
                 onChange={(e) => setSelectedId(e.target.value)}
               >
                 <option value="">Selecione o pacote…</option>
-                {openPackages.map((p) => (
+                {selectablePackages.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} — saída {formatYmd(p.departureDate)}
+                    {p.name} — saída {formatYmd(p.departureDate)} ({packageStatusLabel(p.status, p.isActive)})
                   </option>
                 ))}
               </select>
@@ -151,6 +171,15 @@ export default function AdminClienteNovaReservaPage() {
 
           {detail && !loadingDetail ? (
             <div className="mt-8 max-w-2xl">
+              {(detail.status !== "OPEN" || !detail.isActive) && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+                  Este lote está como <strong>{packageStatusLabel(detail.status, detail.isActive)}</strong>. A reserva
+                  será criada mesmo assim (somente no painel admin).
+                  {detail.remainingPlaces !== null ? (
+                    <> Vagas restantes (capacidade): {detail.remainingPlaces}.</>
+                  ) : null}
+                </div>
+              )}
               <PackageReservationForm
                 packageId={detail.id}
                 slug={detail.slug}

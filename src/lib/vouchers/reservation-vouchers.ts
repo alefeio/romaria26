@@ -4,7 +4,12 @@ import QRCode from "qrcode";
 
 import { prisma } from "@/lib/prisma";
 import { isCustomerPlaceholderEmail } from "@/lib/customer-placeholder-email";
+import {
+  buildCustomerAccessBlockHtml,
+  ensureTempPasswordForPendingFirstLogin,
+} from "@/lib/customers/access-credentials";
 import { resolvePublicAppUrl } from "@/lib/email";
+import type { SendEmailAttachment } from "@/lib/email";
 import { sendEmailAndRecord } from "@/lib/email/send-and-record";
 import { getEmailBranding, wrapBrandedEmail } from "@/lib/email/branding";
 
@@ -141,15 +146,22 @@ export async function ensureReservationVouchers(reservationId: string) {
   return prisma.$transaction(async (tx) => ensureReservationVouchersTx(tx, reservationId));
 }
 
+function dataUrlToBase64(dataUrl: string): string {
+  const i = dataUrl.indexOf("base64,");
+  return i >= 0 ? dataUrl.slice(i + "base64,".length) : dataUrl;
+}
+
 export async function sendReservationVouchersIfPaid(reservationId: string, performedByUserId?: string | null) {
   const reservation = await prisma.reservation.findUnique({
     where: { id: reservationId },
     select: {
       id: true,
+      userId: true,
       paymentStatus: true,
       customerEmailSnapshot: true,
       customerNameSnapshot: true,
       package: { select: { name: true, departureDate: true, departureTime: true, boardingLocation: true, slug: true } },
+      user: { select: { id: true, email: true, mustChangePassword: true } },
     },
   });
   if (!reservation) return { ok: false as const, reason: "NOT_FOUND" as const };
@@ -182,38 +194,53 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
 
   const publicUrl = await resolvePublicAppUrl();
   const when = `${reservation.package.name} (${reservation.package.departureDate.toISOString().slice(0, 10)} às ${reservation.package.departureTime})`;
+  const branding = await getEmailBranding();
+
+  let temporaryPassword: string | null = null;
+  if (reservation.user.mustChangePassword) {
+    const creds = await ensureTempPasswordForPendingFirstLogin(reservation.userId);
+    temporaryPassword = creds?.temporaryPassword ?? null;
+  }
+  const accessEmail = !isCustomerPlaceholderEmail(reservation.user.email)
+    ? reservation.user.email
+    : customerEmail;
+
+  const accessBlockCustomer = buildCustomerAccessBlockHtml({
+    loginUrl: branding.loginUrl,
+    resetUrl: branding.resetPasswordUrl,
+    accessEmail,
+    temporaryPassword,
+  });
 
   const vouchersWithQr = await Promise.all(
-    ensured.vouchers.map(async (v) => {
+    ensured.vouchers.map(async (v, idx) => {
       const checkinUrl = `${publicUrl}/admin/vouchers/${encodeURIComponent(v.code)}/checkin`;
       const viewUrl = `${publicUrl}/voucher/${encodeURIComponent(v.code)}`;
       const qrDataUrl = await QRCode.toDataURL(checkinUrl, { margin: 1, scale: 6 });
-      return { v, checkinUrl, viewUrl, qrDataUrl };
+      const contentId = `voucher-qr-${idx}-${v.code}`;
+      return { v, checkinUrl, viewUrl, qrDataUrl, contentId };
     })
   );
 
-  const subject = `Ingressos (QR Code) — ${reservation.package.name}`;
-  const html = `
-  <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color:#111">
-    <h2 style="margin:0 0 8px 0">Seus vouchers (ingressos) — ${reservation.package.name}</h2>
-    <div style="margin:0 0 14px 0; font-size:14px; color:#444">
-      <div><strong>Cliente:</strong> ${escapeHtml(reservation.customerNameSnapshot)}</div>
-      <div><strong>Passeio:</strong> ${escapeHtml(when)}</div>
-      <div><strong>Embarque:</strong> ${escapeHtml(reservation.package.boardingLocation)}</div>
-      <div style="margin-top:8px">Apresente o QR Code abaixo na entrada.</div>
-    </div>
-    ${vouchersWithQr
-      .map(({ v, viewUrl, qrDataUrl }) => {
-        const title =
-          v.personType === "ADULT"
-            ? `Adulto #${v.personIndex + 1}`
-            : `Criança #${v.personIndex + 1}`;
-        const age = v.personType === "CHILD" && v.age ? ` · Idade: ${v.age}` : "";
-        const kit = v.personType === "ADULT" ? (v.hasBreakfastKit ? "Sim" : "Não") : "—";
-        return `
+  const attachments: SendEmailAttachment[] = vouchersWithQr.map(({ v, qrDataUrl, contentId }) => ({
+    filename: `qr-${v.code}.png`,
+    content: dataUrlToBase64(qrDataUrl),
+    contentId,
+    contentType: "image/png",
+  }));
+
+  const vouchersHtml = vouchersWithQr
+    .map(({ v, viewUrl, contentId }) => {
+      const title =
+        v.personType === "ADULT"
+          ? `Adulto #${v.personIndex + 1}`
+          : `Criança #${v.personIndex + 1}`;
+      const age = v.personType === "CHILD" && v.age ? ` · Idade: ${v.age}` : "";
+      const kit = v.personType === "ADULT" ? (v.hasBreakfastKit ? "Sim" : "Não") : "—";
+      return `
           <div style="border:1px solid #e5e7eb; border-radius:12px; padding:12px; margin:12px 0">
-            <div style="display:flex; gap:14px; align-items:flex-start">
-              <div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+              <td style="vertical-align:top; padding-right:12px;">
                 <div style="font-size:12px; color:#666">${escapeHtml(title)}</div>
                 <div style="font-size:16px; font-weight:700; margin-top:2px">${escapeHtml(v.name)}</div>
                 <div style="margin-top:6px; font-size:13px; color:#333">
@@ -224,19 +251,40 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
                 <div style="margin-top:8px; font-size:12px; color:#2563eb">
                   Link do voucher: <a href="${viewUrl}">${viewUrl}</a>
                 </div>
-              </div>
-              <div style="margin-left:auto; text-align:center">
-                <img src="${qrDataUrl}" alt="QR Code" style="width:160px; height:160px; background:#fff; border:1px solid #e5e7eb; border-radius:12px" />
-              </div>
-            </div>
+              </td>
+              <td style="vertical-align:top; width:170px; text-align:center;">
+                <img src="cid:${contentId}" alt="QR Code ${escapeHtml(v.code)}" width="160" height="160" style="width:160px; height:160px; background:#fff; border:1px solid #e5e7eb; border-radius:12px; display:block;" />
+              </td>
+            </tr></table>
           </div>
         `;
-      })
-      .join("")}
+    })
+    .join("");
+
+  const subject = `Ingressos (QR Code) — ${reservation.package.name}`;
+  const bodyCore = `
+  <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color:#111">
+    <h2 style="margin:0 0 8px 0">Seus vouchers (ingressos) — ${escapeHtml(reservation.package.name)}</h2>
+    <div style="margin:0 0 14px 0; font-size:14px; color:#444">
+      <div><strong>Cliente:</strong> ${escapeHtml(reservation.customerNameSnapshot)}</div>
+      <div><strong>Passeio:</strong> ${escapeHtml(when)}</div>
+      <div><strong>Embarque:</strong> ${escapeHtml(reservation.package.boardingLocation)}</div>
+      <div style="margin-top:8px">Apresente o QR Code abaixo na entrada.</div>
+    </div>
+    ${vouchersHtml}
   </div>
   `;
-  const branding = await getEmailBranding();
-  const htmlBranded = wrapBrandedEmail({ logoUrl: branding.logoUrl, siteName: branding.siteName, bodyHtml: html });
+
+  const customerHtml = wrapBrandedEmail({
+    logoUrl: branding.logoUrl,
+    siteName: branding.siteName,
+    bodyHtml: `${accessBlockCustomer}${bodyCore}`,
+  });
+  const adminHtml = wrapBrandedEmail({
+    logoUrl: branding.logoUrl,
+    siteName: branding.siteName,
+    bodyHtml: bodyCore,
+  });
 
   await Promise.allSettled([
     alreadyCustomer
@@ -244,7 +292,8 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
       : sendEmailAndRecord({
           to: customerEmail,
           subject,
-          html: htmlBranded,
+          html: customerHtml,
+          attachments,
           emailType: "RESERVATION_VOUCHERS_CUSTOMER",
           entityType: "Reservation",
           entityId: reservationId,
@@ -255,7 +304,8 @@ export async function sendReservationVouchersIfPaid(reservationId: string, perfo
       : sendEmailAndRecord({
           to: adminTo,
           subject: `[ADMIN] ${subject}`,
-          html: htmlBranded,
+          html: adminHtml,
+          attachments,
           emailType: "RESERVATION_VOUCHERS_ADMIN",
           entityType: "Reservation",
           entityId: reservationId,

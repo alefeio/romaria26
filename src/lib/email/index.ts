@@ -7,11 +7,22 @@ import {
   throttleBeforeResendCall,
 } from "@/lib/email/resend-rate-limit";
 
+export interface SendEmailAttachment {
+  /** Nome do arquivo (ex.: qr-1048.png). */
+  filename: string;
+  /** Conteúdo em base64 (sem prefixo data:). */
+  content: string;
+  /** Content-ID para img cid: (ex.: qr-1048) — sem <> . */
+  contentId?: string;
+  contentType?: string;
+}
+
 export interface SendEmailParams {
   to: string | string[];
   subject: string;
   html: string;
   from?: string;
+  attachments?: SendEmailAttachment[];
 }
 
 export interface SendEmailResult {
@@ -42,7 +53,7 @@ export async function resolvePublicAppUrl(): Promise<string> {
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 export async function sendEmail(params: SendEmailParams): Promise<SendEmailResult> {
-  const { to, subject, html, from = EMAIL_FROM } = params;
+  const { to, subject, html, from = EMAIL_FROM, attachments } = params;
   const toList = Array.isArray(to) ? to : [to];
 
   if (!RESEND_API_KEY) {
@@ -57,6 +68,15 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
     const { Resend } = await import("resend");
     const resend = new Resend(RESEND_API_KEY);
     let lastErr = "Erro ao enviar email.";
+    const resendAttachments =
+      attachments && attachments.length > 0
+        ? attachments.map((a) => ({
+            filename: a.filename,
+            content: a.content,
+            contentId: a.contentId,
+            contentType: a.contentType ?? "image/png",
+          }))
+        : undefined;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       await throttleBeforeResendCall();
       const { data, error } = await resend.emails.send({
@@ -64,6 +84,7 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
         to: toList,
         subject,
         html,
+        ...(resendAttachments ? { attachments: resendAttachments } : {}),
       });
       if (!error) {
         return { success: true, messageId: data?.id };

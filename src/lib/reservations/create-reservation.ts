@@ -36,6 +36,11 @@ export type CreateReservationInput = {
   notes?: string | null;
   /** Ao confirmar de imediato, preenche `confirmedAt`. */
   initialStatus?: Extract<ReservationStatus, "PENDING" | "CONFIRMED">;
+  /**
+   * Painel admin: permite reservar em pacote inativo, encerrado, draft, etc.
+   * Continua validando capacidade e existência do pacote.
+   */
+  allowUnavailablePackage?: boolean;
 };
 
 export class ReservationCreateError extends Error {
@@ -88,6 +93,7 @@ export async function createReservationInTransaction(
     customerPhoneSnapshot,
     notes,
     initialStatus = "PENDING",
+    allowUnavailablePackage = false,
   } = input;
 
   if (!isUuid(packageId) || !isUuid(userId)) {
@@ -228,18 +234,24 @@ export async function createReservationInTransaction(
       where: { id: packageId },
     });
 
-    if (!pkg || !pkg.isActive) {
-      throw new ReservationCreateError(
-        "PACKAGE_UNAVAILABLE",
-        "Pacote indisponível ou inativo."
-      );
+    if (!pkg) {
+      throw new ReservationCreateError("PACKAGE_UNAVAILABLE", "Pacote não encontrado.");
     }
 
-    if (pkg.status !== "OPEN" && pkg.status !== "SOLD_OUT") {
-      throw new ReservationCreateError(
-        "PACKAGE_UNAVAILABLE",
-        "Este pacote não está aberto para reservas."
-      );
+    if (!allowUnavailablePackage) {
+      if (!pkg.isActive) {
+        throw new ReservationCreateError(
+          "PACKAGE_UNAVAILABLE",
+          "Pacote indisponível ou inativo."
+        );
+      }
+
+      if (pkg.status !== "OPEN" && pkg.status !== "SOLD_OUT") {
+        throw new ReservationCreateError(
+          "PACKAGE_UNAVAILABLE",
+          "Este pacote não está aberto para reservas."
+        );
+      }
     }
 
     if (!pkg.breakfastKitAvailable && kits.some(Boolean)) {
@@ -255,11 +267,13 @@ export async function createReservationInTransaction(
     });
 
     const used = agg._sum.quantity ?? 0;
-    if (used < pkg.capacity && pkg.status === "SOLD_OUT") {
-      await tx.package.update({ where: { id: pkg.id }, data: { status: "OPEN" } });
-      pkg.status = "OPEN";
+    if (!allowUnavailablePackage) {
+      if (used < pkg.capacity && pkg.status === "SOLD_OUT") {
+        await tx.package.update({ where: { id: pkg.id }, data: { status: "OPEN" } });
+        pkg.status = "OPEN";
+      }
     }
-    if (used + quantity > pkg.capacity) {
+    if (used + quantity > pkg.capacity && !allowUnavailablePackage) {
       throw new ReservationCreateError(
         "INSUFFICIENT_CAPACITY",
         "Não há vagas suficientes para esta quantidade."
@@ -319,7 +333,7 @@ export async function createReservationInTransaction(
     // Regra: vouchers e numeração sequencial são definidos no ato da reserva.
     await ensureReservationVouchersTx(tx, created.id);
 
-    if (used + quantity >= pkg.capacity && pkg.status === "OPEN") {
+    if (!allowUnavailablePackage && used + quantity >= pkg.capacity && pkg.status === "OPEN") {
       await tx.package.update({ where: { id: pkg.id }, data: { status: "SOLD_OUT" } });
 
       // Regra: ao esgotar um lote, abrir automaticamente o próximo lote.
@@ -341,14 +355,21 @@ export async function createReservationInTransaction(
 
 /**
  * Vagas restantes do pacote (somente leitura; não persiste contador).
+ * Com `forAdmin: true`, calcula mesmo para pacotes inativos/encerrados (uso no painel).
  */
-export async function getPackageRemainingCapacity(packageId: string): Promise<number | null> {
+export async function getPackageRemainingCapacity(
+  packageId: string,
+  opts?: { forAdmin?: boolean }
+): Promise<number | null> {
   const pkg = await prisma.package.findUnique({
     where: { id: packageId },
     select: { capacity: true, isActive: true, status: true },
   });
-  if (!pkg || !pkg.isActive) return null;
-  if (pkg.status !== "OPEN" && pkg.status !== "SOLD_OUT") return null;
+  if (!pkg) return null;
+  if (!opts?.forAdmin) {
+    if (!pkg.isActive) return null;
+    if (pkg.status !== "OPEN" && pkg.status !== "SOLD_OUT") return null;
+  }
 
   // Expirar pendentes antigos (24h) para devolver vaga automaticamente.
   const expiry = new Date(Date.now() - 24 * 60 * 60 * 1000);

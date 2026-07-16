@@ -5,6 +5,10 @@ import { requireAdminApi } from "@/lib/api-admin-guard";
 import { jsonErr, jsonOk } from "@/lib/http";
 import { createAuditLog } from "@/lib/audit";
 import { isCustomerPlaceholderEmail } from "@/lib/customer-placeholder-email";
+import {
+  buildCustomerAccessBlockHtml,
+  ensureTempPasswordForPendingFirstLogin,
+} from "@/lib/customers/access-credentials";
 import { sendEmailAndRecord } from "@/lib/email/send-and-record";
 import { getEmailBranding, wrapBrandedEmail } from "@/lib/email/branding";
 import {
@@ -18,15 +22,6 @@ function buildWhatsAppHref(contactWhatsapp: string | null | undefined, text: str
   if (digits.length < 10) return null;
   const withCountry = digits.startsWith("55") ? digits : "55" + digits;
   return `https://wa.me/${withCountry}?text=${encodeURIComponent(text)}`;
-}
-
-function escapeHtml(s: string): string {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
 }
 
 export async function GET(request: Request) {
@@ -109,7 +104,7 @@ export async function POST(request: Request) {
 
   const target = await prisma.user.findUnique({
     where: { id: d.userId },
-    select: { id: true, role: true, isActive: true, name: true, email: true },
+    select: { id: true, role: true, isActive: true, name: true, email: true, mustChangePassword: true },
   });
   if (!target || target.role !== "CUSTOMER") {
     return jsonErr("INVALID_CUSTOMER", "Cliente não encontrado ou inválido.", 404);
@@ -141,6 +136,7 @@ export async function POST(request: Request) {
       customerPhoneSnapshot: d.customerPhoneSnapshot,
       notes: d.notes ?? null,
       initialStatus: d.initialStatus,
+      allowUnavailablePackage: true,
     });
 
     const [pkg, settings, adminUsers] = await Promise.all([
@@ -202,25 +198,49 @@ export async function POST(request: Request) {
     const customerEmail = reservation.customerEmailSnapshot.trim();
     const sendToCustomer = customerEmail.length > 0 && !isCustomerPlaceholderEmail(customerEmail);
 
-    const pre = summaryText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const accessBlock = `
-      <div style="margin: 14px 0 0; padding: 14px; border:1px solid #e5e7eb; border-radius: 12px; background:#f9fafb;">
-        <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">Acompanhar sua reserva</div>
-        <div style="font-size: 13px; color:#111827;">
-          <div><strong>Área do cliente:</strong> <a href="${loginUrl}">${loginUrl}</a></div>
-          <div><strong>E-mail de acesso:</strong> ${escapeHtml(target.email)}</div>
-          <div style="margin-top:8px; font-size: 12px; color:#6b7280;">Entre com o <strong>e-mail cadastrado e sua senha</strong>. Se esquecer a senha, redefina em: <a href="${resetUrl}">${resetUrl}</a></div>
-        </div>
-      </div>
-    `;
+    let temporaryPassword: string | null = null;
+    if (sendToCustomer && target.mustChangePassword) {
+      const creds = await ensureTempPasswordForPendingFirstLogin(target.id);
+      temporaryPassword = creds?.temporaryPassword ?? null;
+    }
 
-    const html = wrapBrandedEmail({
+    const accessEmail = !isCustomerPlaceholderEmail(target.email) ? target.email : customerEmail;
+    const accessBlock = buildCustomerAccessBlockHtml({
+      loginUrl,
+      resetUrl,
+      accessEmail,
+      temporaryPassword,
+    });
+
+    const pre = summaryText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    const customerHtml = wrapBrandedEmail({
       logoUrl: branding.logoUrl,
       siteName: branding.siteName,
       bodyHtml: `
         <h2 style="margin:0 0 6px; font-size: 18px;">Reserva recebida</h2>
         <p style="margin:0 0 14px; color:#374151; font-size: 14px;">Recebemos sua reserva. Confira os detalhes abaixo.</p>
         ${accessBlock}
+        <div style="margin-top: 16px;">
+          <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color:#6b7280; margin-bottom: 8px;">Detalhes da reserva</div>
+          <pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; white-space: pre-wrap; line-height: 1.45; background:#fff; border:1px solid #e5e7eb; border-radius: 12px; padding: 12px; margin:0;">${pre}</pre>
+        </div>
+      `,
+    });
+
+    const adminAccessBlock = buildCustomerAccessBlockHtml({
+      loginUrl,
+      resetUrl,
+      accessEmail,
+      temporaryPassword: null,
+    });
+    const adminHtml = wrapBrandedEmail({
+      logoUrl: branding.logoUrl,
+      siteName: branding.siteName,
+      bodyHtml: `
+        <h2 style="margin:0 0 6px; font-size: 18px;">Reserva recebida</h2>
+        <p style="margin:0 0 14px; color:#374151; font-size: 14px;">Recebemos sua reserva. Confira os detalhes abaixo.</p>
+        ${adminAccessBlock}
         <div style="margin-top: 16px;">
           <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color:#6b7280; margin-bottom: 8px;">Detalhes da reserva</div>
           <pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; white-space: pre-wrap; line-height: 1.45; background:#fff; border:1px solid #e5e7eb; border-radius: 12px; padding: 12px; margin:0;">${pre}</pre>
@@ -235,7 +255,7 @@ export async function POST(request: Request) {
         ? sendEmailAndRecord({
             to: customerEmail,
             subject,
-            html,
+            html: customerHtml,
             emailType: "RESERVATION_CREATED_CUSTOMER",
             entityType: "Reservation",
             entityId: reservation.id,
@@ -246,7 +266,7 @@ export async function POST(request: Request) {
         ? sendEmailAndRecord({
             to: adminTo,
             subject: `[ADMIN] ${subject}`,
-            html,
+            html: adminHtml,
             emailType: "RESERVATION_CREATED_ADMIN",
             entityType: "Reservation",
             entityId: reservation.id,

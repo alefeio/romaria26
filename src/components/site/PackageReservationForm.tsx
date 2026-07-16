@@ -83,8 +83,14 @@ export function PackageReservationForm({
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
-  const maxQty = remainingPlaces !== null && remainingPlaces > 0 ? remainingPlaces : 1;
-  const canBook = (isAdminForCustomer || loggedIn) && remainingPlaces !== null && remainingPlaces > 0;
+  const maxQty = isAdminForCustomer
+    ? Math.max(1, remainingPlaces !== null && remainingPlaces > 0 ? remainingPlaces : 50)
+    : remainingPlaces !== null && remainingPlaces > 0
+      ? remainingPlaces
+      : 1;
+  const canBook = isAdminForCustomer
+    ? true
+    : loggedIn && remainingPlaces !== null && remainingPlaces > 0;
   const quantity = Math.max(0, adultsCount) + Math.max(0, childrenCount);
 
   useEffect(() => {
@@ -312,7 +318,7 @@ export function PackageReservationForm({
     );
   }
 
-  if (remainingPlaces === null || remainingPlaces <= 0) {
+  if (!isAdminForCustomer && (remainingPlaces === null || remainingPlaces <= 0)) {
     return (
       <div className="rounded-xl border border-[var(--igh-border)] bg-[var(--card-bg)] p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-[var(--igh-secondary)]">Reservas</h2>

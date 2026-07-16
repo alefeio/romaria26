@@ -24,7 +24,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
   const item = await prisma.package.findUnique({ where: { id } });
   if (!item) return jsonErr("NOT_FOUND", "Pacote não encontrado.", 404);
 
-  const remainingPlaces = await getPackageRemainingCapacity(id);
+  const remainingPlaces = await getPackageRemainingCapacity(id, { forAdmin: true });
 
   return jsonOk({
     item: {

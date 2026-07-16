@@ -60,6 +60,7 @@ export default function AdminClienteDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [sendingReset, setSendingReset] = useState(false);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
@@ -206,6 +207,47 @@ export default function AdminClienteDetailPage() {
               <div className="flex flex-wrap justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={() => void load()}>
                   Atualizar
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={sendingReset || isCustomerPlaceholderEmail(item.email) || !item.isActive}
+                  title={
+                    isCustomerPlaceholderEmail(item.email)
+                      ? "Informe um e-mail de contato válido antes de enviar a redefinição."
+                      : !item.isActive
+                        ? "Cliente inativo."
+                        : "Envia link de redefinição de senha por e-mail"
+                  }
+                  onClick={async () => {
+                    if (!id || sendingReset) return;
+                    if (
+                      !window.confirm(
+                        `Enviar e-mail de redefinição de senha para ${displayCustomerEmail(item.email)}?`
+                      )
+                    ) {
+                      return;
+                    }
+                    setSendingReset(true);
+                    try {
+                      const res = await fetch(`/api/admin/customers/${id}/send-password-reset`, {
+                        method: "POST",
+                      });
+                      const json = (await res.json()) as ApiResponse<{ message: string }>;
+                      if (!res.ok || !json.ok) {
+                        toast.push(
+                          "error",
+                          !json.ok ? json.error.message : "Falha ao enviar o e-mail de redefinição."
+                        );
+                        return;
+                      }
+                      toast.push("success", json.data.message || "E-mail de redefinição enviado.");
+                    } finally {
+                      setSendingReset(false);
+                    }
+                  }}
+                >
+                  {sendingReset ? "Enviando…" : "Enviar redefinição de senha"}
                 </Button>
                 <Link
                   href={`/admin/clientes/${id}/nova-reserva`}
