@@ -34,7 +34,10 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
   const result = await applyReservationDiscountById(id, { amount, note });
   if ("err" in result) {
     if (result.err === "NOT_FOUND") return jsonErr("NOT_FOUND", "Reserva não encontrada.", 404);
-    return jsonErr("INVALID_AMOUNT", result.message, 422);
+    if (result.err === "INVALID_AMOUNT") {
+      return jsonErr("INVALID_AMOUNT", result.message, 422);
+    }
+    return jsonErr("INVALID_AMOUNT", "Valor de desconto inválido.", 422);
   }
 
   const item = result.ok;
