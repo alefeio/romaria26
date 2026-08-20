@@ -2,6 +2,11 @@ import "server-only";
 
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import {
+  EMPTY_VOUCHER_STATS,
+  loadBillingVoucherStats,
+  type BillingVoucherStats,
+} from "@/lib/billing/voucher-stats";
 
 export function ymdUtc(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -67,6 +72,7 @@ export type SalesReportData = {
     paymentsAmount: string;
     overdueCount: number;
     overdueAmount: string;
+    vouchers: BillingVoucherStats;
   };
   reservations: SalesReportReservation[];
   payments: SalesReportPayment[];
@@ -112,7 +118,7 @@ export async function loadSalesReportData(opts: {
   const now = new Date();
   const todayStart = new Date(ymdUtc(now) + "T00:00:00.000Z");
 
-  const [reservations, payments, overdueInstallments, agg] = await Promise.all([
+  const [reservations, payments, overdueInstallments, agg, vouchers] = await Promise.all([
     prisma.reservation.findMany({
       where: baseWhere,
       orderBy: [{ reservedAt: "desc" }],
@@ -164,6 +170,7 @@ export async function loadSalesReportData(opts: {
       _sum: { totalDue: true, totalPaid: true },
       _count: { _all: true },
     }),
+    loadBillingVoucherStats(baseWhere).catch(() => EMPTY_VOUCHER_STATS),
   ]);
 
   const sumDue = new Prisma.Decimal(money(agg._sum.totalDue));
@@ -186,6 +193,7 @@ export async function loadSalesReportData(opts: {
       paymentsAmount: paymentsAmount.toString(),
       overdueCount: overdueInstallments.length,
       overdueAmount: overdueAmount.toString(),
+      vouchers,
     },
     reservations: reservations.map((r) => {
       const due = new Prisma.Decimal(money(r.totalDue));

@@ -2,6 +2,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminApi } from "@/lib/api-admin-guard";
 import { jsonErr, jsonOk } from "@/lib/http";
+import { loadBillingVoucherStats } from "@/lib/billing/voucher-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -41,11 +42,17 @@ export async function GET(request: Request) {
       status: { not: "CANCELLED" as const },
     };
 
-    const totals = await prisma.reservation.aggregate({
-      where: baseWhere,
-      _sum: { totalDue: true, totalPaid: true },
-      _count: { _all: true },
-    });
+    const [totals, vouchers] = await Promise.all([
+      prisma.reservation.aggregate({
+        where: baseWhere,
+        _sum: { totalDue: true, totalPaid: true },
+        _count: { _all: true },
+      }),
+      loadBillingVoucherStats(baseWhere).catch((err) => {
+        console.error("[api/admin/billing/summary] voucher stats", err);
+        return { total: 0, adults: 0, paidChildren: 0, unpaidChildren: 0, kits: 0 };
+      }),
+    ]);
 
     const now = new Date();
     const today = ymdUtc(now);
@@ -90,6 +97,7 @@ export async function GET(request: Request) {
         totalDue: new Prisma.Decimal(sumDue.toString()).toString(),
         totalPaid: new Prisma.Decimal(sumPaid.toString()).toString(),
         totalToReceive: unpaid.toString(),
+        vouchers,
       },
       overdue: {
         count: overdueInstallments.length,

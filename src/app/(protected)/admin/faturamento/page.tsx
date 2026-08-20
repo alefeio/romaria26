@@ -11,7 +11,19 @@ import type { ApiResponse } from "@/lib/api-types";
 
 type Billing = {
   range: { from: string | null; to: string | null };
-  totals: { reservationsCount: number; totalDue: string; totalPaid: string; totalToReceive: string };
+  totals: {
+    reservationsCount: number;
+    totalDue: string;
+    totalPaid: string;
+    totalToReceive: string;
+    vouchers?: {
+      total: number;
+      adults: number;
+      paidChildren: number;
+      unpaidChildren: number;
+      kits: number;
+    };
+  };
   overdue: {
     count: number;
     totalAmount: string;
@@ -206,7 +218,7 @@ export default function AdminFaturamentoPage() {
         <p className="mt-6 text-[var(--text-secondary)]">Sem dados.</p>
       ) : (
         <>
-          <div className="mt-6 grid gap-4 lg:grid-cols-4">
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <div className="card">
               <div className="card-header">Reservas</div>
               <div className="card-body text-sm">
@@ -214,6 +226,35 @@ export default function AdminFaturamentoPage() {
                   {data.totals.reservationsCount ?? 0}
                 </div>
                 <div className="text-xs text-[var(--text-muted)]">Não canceladas{data.range.from || data.range.to ? " (período filtrado)" : " (geral)"}</div>
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-header">Vouchers</div>
+              <div className="card-body text-sm">
+                <div className="text-2xl font-semibold text-[var(--text-primary)]">
+                  {data.totals.vouchers?.total ?? 0}
+                </div>
+                <ul className="mt-2 space-y-1 text-xs text-[var(--text-secondary)]">
+                  <li className="flex justify-between gap-3">
+                    <span>Adultos</span>
+                    <span className="font-medium text-[var(--text-primary)]">{data.totals.vouchers?.adults ?? 0}</span>
+                  </li>
+                  <li className="flex justify-between gap-3">
+                    <span>Crianças pagas</span>
+                    <span className="font-medium text-[var(--text-primary)]">{data.totals.vouchers?.paidChildren ?? 0}</span>
+                  </li>
+                  <li className="flex justify-between gap-3">
+                    <span>Crianças não pagas</span>
+                    <span className="font-medium text-[var(--text-primary)]">{data.totals.vouchers?.unpaidChildren ?? 0}</span>
+                  </li>
+                  <li className="flex justify-between gap-3">
+                    <span>Kits café</span>
+                    <span className="font-medium text-[var(--text-primary)]">{data.totals.vouchers?.kits ?? 0}</span>
+                  </li>
+                </ul>
+                <div className="mt-2 text-xs text-[var(--text-muted)]">
+                  Criança paga: 6 anos ou mais, sem cortesia
+                </div>
               </div>
             </div>
             <div className="card">
