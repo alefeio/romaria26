@@ -83,6 +83,9 @@ export default async function AdminVoucherDetailPage({ params }: Props) {
           </div>
           <div className="mt-2 text-xs text-[var(--text-muted)]">
             Pagamento da reserva: <span className="font-medium">{v.reservation.paymentStatus}</span>
+            {" · "}
+            Liberação:{" "}
+            <span className="font-medium">{v.releasedAt ? "Liberado" : "Aguardando quitação"}</span>
           </div>
           {shareCount > 0 ? (
             <div className="mt-2 text-xs text-[var(--text-muted)]">

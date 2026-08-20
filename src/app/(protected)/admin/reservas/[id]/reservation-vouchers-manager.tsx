@@ -22,13 +22,25 @@ export type VoucherItem = {
   shirtSize: string;
   hasBreakfastKit: boolean;
   usedAt: string | null;
+  releasedAt: string | null;
   createdAt: string;
+};
+
+type ReservationTotals = {
+  adultsCount: number;
+  childrenCount: number;
+  quantity: number;
+  totalPrice: string;
+  totalDue: string;
+  totalPaid: string;
+  paymentStatus: string;
 };
 
 type Props = {
   reservationId: string;
   adultsCount: number;
   childrenCount: number;
+  paymentStatus: string;
   initialVouchers: VoucherItem[];
 };
 
@@ -52,16 +64,27 @@ const emptyForm = (): FormState => ({
   hasBreakfastKit: false,
 });
 
-export function ReservationVouchersManager({ reservationId, adultsCount, childrenCount, initialVouchers }: Props) {
+export function ReservationVouchersManager({
+  reservationId,
+  adultsCount,
+  childrenCount,
+  paymentStatus: initialPaymentStatus,
+  initialVouchers,
+}: Props) {
   const toast = useToast();
   const router = useRouter();
   const [vouchers, setVouchers] = useState<VoucherItem[]>(initialVouchers);
   const [counts, setCounts] = useState({ adultsCount, childrenCount });
+  const [paymentStatus, setPaymentStatus] = useState(initialPaymentStatus);
   const [actingId, setActingId] = useState<string | null>(null);
 
   useEffect(() => {
     setCounts({ adultsCount, childrenCount });
   }, [adultsCount, childrenCount]);
+
+  useEffect(() => {
+    setPaymentStatus(initialPaymentStatus);
+  }, [initialPaymentStatus]);
 
   useEffect(() => {
     setVouchers(initialVouchers);
@@ -77,7 +100,7 @@ export function ReservationVouchersManager({ reservationId, adultsCount, childre
     const res = await fetch(`/api/admin/reservations/${reservationId}/vouchers`);
     const json = (await res.json()) as ApiResponse<{
       vouchers: VoucherItem[];
-      reservation: { adultsCount: number; childrenCount: number };
+      reservation: ReservationTotals;
     }>;
     if (res.ok && json.ok) {
       setVouchers(json.data.vouchers);
@@ -85,6 +108,7 @@ export function ReservationVouchersManager({ reservationId, adultsCount, childre
         adultsCount: json.data.reservation.adultsCount,
         childrenCount: json.data.reservation.childrenCount,
       });
+      setPaymentStatus(json.data.reservation.paymentStatus);
     }
     router.refresh();
   }, [reservationId, router]);
@@ -182,17 +206,22 @@ export function ReservationVouchersManager({ reservationId, adultsCount, childre
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const json = (await res.json()) as ApiResponse<{ voucher: VoucherItem }>;
+      const json = (await res.json()) as ApiResponse<{ voucher: VoucherItem; reservation: ReservationTotals | null }>;
       if (!res.ok || !json.ok) {
         toast.push("error", !json.ok ? json.error.message : "Falha ao salvar voucher.");
         return;
       }
+      const totals = json.data.reservation;
+      const statusMsg = totals
+        ? ` Status: ${totals.paymentStatus} · Devido: ${Number.parseFloat(totals.totalDue).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`
+        : "";
       toast.push(
         "success",
         editing
-          ? "Voucher atualizado. Totais da reserva recalculados."
-          : "Voucher criado. Valor incluído nos totais da reserva."
+          ? `Voucher atualizado. Totais da reserva recalculados.${statusMsg}`
+          : `Voucher criado. Valor incluído nos totais da reserva.${statusMsg}`
       );
+      if (totals) setPaymentStatus(totals.paymentStatus);
       setModalOpen(false);
       setEditing(null);
       await reload();
@@ -234,7 +263,12 @@ export function ReservationVouchersManager({ reservationId, adultsCount, childre
             type="button"
             size="sm"
             variant="secondary"
-            disabled={sendingEmail || vouchers.length === 0}
+            disabled={sendingEmail || vouchers.length === 0 || paymentStatus !== "PAID"}
+            title={
+              paymentStatus !== "PAID"
+                ? "Disponível apenas quando a reserva estiver 100% paga."
+                : undefined
+            }
             onClick={() => void sendAllVouchersEmail()}
           >
             {sendingEmail ? "Enviando…" : "Enviar vouchers por e-mail"}
@@ -246,9 +280,10 @@ export function ReservationVouchersManager({ reservationId, adultsCount, childre
       </div>
       <div className="card-body">
         <p className="mb-3 text-xs text-[var(--text-muted)]">
-          Reserva: {counts.adultsCount} adulto(s), {counts.childrenCount} criança(s). Ao criar ou remover vouchers, o
-          valor devido é recalculado (adulto/criança ≥ 6 anos + kit café), com os preços da reserva. Códigos por faixa
-          (kit, sem kit, criança).
+          Reserva: {counts.adultsCount} adulto(s), {counts.childrenCount} criança(s) · Pagamento:{" "}
+          <span className="font-medium">{paymentStatus}</span>. Ao criar ou remover vouchers, o valor devido é
+          recalculado (adulto/criança ≥ 6 anos + kit café). Se a reserva estava quitada, um novo ingresso pago muda o
+          status para PARTIAL até quitar a diferença.
         </p>
         <Table>
           <thead>
@@ -258,6 +293,7 @@ export function ReservationVouchersManager({ reservationId, adultsCount, childre
               <Th>Código</Th>
               <Th>Camisa</Th>
               <Th>Kit café</Th>
+              <Th>Liberação</Th>
               <Th>Status</Th>
               <Th className="text-right">Ações</Th>
             </tr>
@@ -275,6 +311,7 @@ export function ReservationVouchersManager({ reservationId, adultsCount, childre
                   ) : null}
                 </Td>
                 <Td>{v.personType === "ADULT" ? (v.hasBreakfastKit ? "Sim" : "Não") : "—"}</Td>
+                <Td className="text-xs">{v.releasedAt ? "Liberado" : "Aguardando pagamento"}</Td>
                 <Td className="text-xs">{v.usedAt ? "Usado" : "Não usado"}</Td>
                 <Td className="text-right">
                   <div className="flex flex-wrap justify-end gap-1">
@@ -304,7 +341,7 @@ export function ReservationVouchersManager({ reservationId, adultsCount, childre
             ))}
             {vouchers.length === 0 ? (
               <tr>
-                <Td colSpan={7} className="py-8 text-center text-[var(--text-muted)]">
+                <Td colSpan={8} className="py-8 text-center text-[var(--text-muted)]">
                   Nenhum voucher. Clique em &quot;Novo voucher&quot; ou quite o pagamento para gerar automaticamente.
                 </Td>
               </tr>

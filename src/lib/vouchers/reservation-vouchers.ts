@@ -12,6 +12,7 @@ import { resolvePublicAppUrl } from "@/lib/email";
 import type { SendEmailAttachment } from "@/lib/email";
 import { sendEmailAndRecord } from "@/lib/email/send-and-record";
 import { getEmailBranding, wrapBrandedEmail } from "@/lib/email/branding";
+import { releaseReservationVouchersIfPaid } from "@/lib/vouchers/voucher-release";
 
 export const VOUCHER_RANGES = {
   ADULT_WITH_KIT: { from: 1, to: 1000 },
@@ -139,6 +140,9 @@ export async function ensureReservationVouchersTx(tx: TxClient, reservationId: s
       where: { reservationId },
       orderBy: [{ personType: "asc" }, { personIndex: "asc" }],
     });
+
+    await releaseReservationVouchersIfPaid(tx, reservationId);
+
     return { reservation, vouchers };
 }
 
@@ -179,11 +183,13 @@ export async function sendReservationVouchersIfPaid(
 
   const ensured = await ensureReservationVouchers(reservationId);
   if (!ensured) return { ok: false as const, reason: "NOT_FOUND" as const };
-  if (ensured.vouchers.length === 0) {
+
+  const releasedVouchers = ensured.vouchers.filter((v) => v.releasedAt != null);
+  if (releasedVouchers.length === 0) {
     return { ok: false as const, reason: "NO_VOUCHERS" as const };
   }
 
-  const newestVoucherAt = ensured.vouchers.reduce<Date | null>((max, v) => {
+  const newestVoucherAt = releasedVouchers.reduce<Date | null>((max, v) => {
     if (!max || v.createdAt > max) return v.createdAt;
     return max;
   }, null);
@@ -240,7 +246,7 @@ export async function sendReservationVouchersIfPaid(
   });
 
   const vouchersWithQr = await Promise.all(
-    ensured.vouchers.map(async (v, idx) => {
+    releasedVouchers.map(async (v, idx) => {
       const checkinUrl = `${publicUrl}/admin/vouchers/${encodeURIComponent(v.code)}/checkin`;
       const viewUrl = `${publicUrl}/voucher/${encodeURIComponent(v.code)}`;
       const qrDataUrl = await QRCode.toDataURL(checkinUrl, { margin: 1, scale: 6 });

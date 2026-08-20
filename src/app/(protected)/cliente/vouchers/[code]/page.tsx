@@ -86,7 +86,7 @@ export default async function ClienteVoucherPage({ params }: Props) {
 
   const base = await resolvePublicAppUrl();
   const checkinUrl = `${base}/admin/vouchers/${encodeURIComponent(v.code)}/checkin`;
-  const canValidate = v.reservation.paymentStatus === "PAID";
+  const canValidate = Boolean(v.releasedAt);
   const qrDataUrl = v.usedAt || !canValidate ? null : await QRCode.toDataURL(checkinUrl, { margin: 1, scale: 8 });
   const label = v.personType === "ADULT" ? `Adulto #${v.personIndex + 1}` : `Criança #${v.personIndex + 1}`;
   const age = v.personType === "CHILD" && v.age ? v.age : null;

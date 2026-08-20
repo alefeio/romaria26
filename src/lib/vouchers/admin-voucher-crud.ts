@@ -16,6 +16,7 @@ export type VoucherRow = {
   shirtSize: string;
   hasBreakfastKit: boolean;
   usedAt: string | null;
+  releasedAt: string | null;
   createdAt: string;
 };
 
@@ -30,6 +31,7 @@ export function serializeVoucher(v: {
   shirtSize: string;
   hasBreakfastKit: boolean;
   usedAt: Date | null;
+  releasedAt: Date | null;
   createdAt: Date;
 }): VoucherRow {
   return {
@@ -43,6 +45,7 @@ export function serializeVoucher(v: {
     shirtSize: v.shirtSize,
     hasBreakfastKit: v.hasBreakfastKit,
     usedAt: v.usedAt?.toISOString() ?? null,
+    releasedAt: v.releasedAt?.toISOString() ?? null,
     createdAt: v.createdAt.toISOString(),
   };
 }

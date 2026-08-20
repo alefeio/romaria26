@@ -23,6 +23,7 @@ export default async function AdminVoucherCheckinPage({ params }: Props) {
         select: {
           id: true,
           customerNameSnapshot: true,
+          paymentStatus: true,
           package: { select: { name: true, slug: true, departureDate: true } },
         },
       },
@@ -31,25 +32,28 @@ export default async function AdminVoucherCheckinPage({ params }: Props) {
   if (!v) notFound();
 
   const wasUsed = Boolean(v.usedAt);
+  const canCheckIn = Boolean(v.releasedAt) && !wasUsed;
   const now = new Date();
 
-  const updated = wasUsed
-    ? v
-    : await prisma.reservationVoucher.update({
-        where: { id: v.id },
-        data: { usedAt: now },
-        include: {
-          reservation: {
-            select: {
-              id: true,
-              customerNameSnapshot: true,
-              package: { select: { name: true, slug: true, departureDate: true } },
+  const updated =
+    canCheckIn && !wasUsed
+      ? await prisma.reservationVoucher.update({
+          where: { id: v.id },
+          data: { usedAt: now },
+          include: {
+            reservation: {
+              select: {
+                id: true,
+                customerNameSnapshot: true,
+                paymentStatus: true,
+                package: { select: { name: true, slug: true, departureDate: true } },
+              },
             },
           },
-        },
-      });
+        })
+      : v;
 
-  if (!wasUsed) {
+  if (canCheckIn && !wasUsed) {
     await createAuditLog({
       entityType: "ReservationVoucher",
       entityId: updated.id,
@@ -87,7 +91,12 @@ export default async function AdminVoucherCheckinPage({ params }: Props) {
         </div>
 
         <div className="mt-4">
-          {updated.usedAt ? (
+          {!v.releasedAt && !wasUsed ? (
+            <div className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+              Check-in bloqueado: este ingresso ainda não foi liberado (reserva com pagamento pendente — status{" "}
+              <strong>{updated.reservation.paymentStatus}</strong>).
+            </div>
+          ) : updated.usedAt ? (
             <div className={`rounded-lg px-3 py-2 text-sm ${wasUsed ? "bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100" : "bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100"}`}>
               {wasUsed ? (
                 <>Voucher já estava como <strong>Usado</strong> (em {formatDateTimeBr(updated.usedAt)}).</>
@@ -105,4 +114,3 @@ export default async function AdminVoucherCheckinPage({ params }: Props) {
     </div>
   );
 }
-

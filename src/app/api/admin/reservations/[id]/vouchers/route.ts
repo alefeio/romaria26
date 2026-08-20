@@ -100,14 +100,6 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       });
       if ("err" in created) return created;
 
-      await createAuditLog({
-        entityType: "Reservation",
-        entityId: id,
-        action: "RESERVATION_VOUCHER_CREATED",
-        diff: { voucherId: created.ok.id, code: created.ok.code, personType: d.personType },
-        performedByUserId: auth.id,
-      });
-
       return { ok: created.ok, totals: created.totals };
     });
 
@@ -118,6 +110,14 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       }
       return jsonErr("UNKNOWN", "Falha ao criar voucher.", 500);
     }
+
+    await createAuditLog({
+      entityType: "Reservation",
+      entityId: id,
+      action: "RESERVATION_VOUCHER_CREATED",
+      diff: { voucherId: result.ok.id, code: result.ok.code, personType: d.personType },
+      performedByUserId: auth.id,
+    }).catch((e) => console.error("[POST voucher] audit log falhou", e));
 
     return jsonOk(
       { voucher: serializeVoucher(result.ok), reservation: serializeTotals(result.totals) },

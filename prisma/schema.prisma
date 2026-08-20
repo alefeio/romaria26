@@ -146,6 +146,8 @@ model ReservationVoucher {
   hasBreakfastKit Boolean @default(false)
   createdAt     DateTime @default(now())
   usedAt        DateTime?
+  /** Liberado para uso (QR/check-in/e-mail) após quitação correspondente. */
+  releasedAt    DateTime?
   /** Data/hora em que este voucher entrou em uma exportação (PDF). */
   exportedAt    DateTime?
   /** Usuário (admin/master) que realizou a exportação. */

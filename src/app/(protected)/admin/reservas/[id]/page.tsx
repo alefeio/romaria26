@@ -144,6 +144,7 @@ export default async function AdminReservaDetailPage({ params }: Props) {
         reservationId={r.id}
         adultsCount={r.adultsCount}
         childrenCount={r.childrenCount}
+        paymentStatus={r.paymentStatus}
         initialVouchers={r.vouchers.map(serializeVoucher)}
       />
     </div>

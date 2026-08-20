@@ -61,6 +61,7 @@ export default async function VoucherPage({ params, searchParams }: Props) {
           id: true,
           customerNameSnapshot: true,
           userId: true,
+          paymentStatus: true,
           package: { select: { name: true, departureDate: true, departureTime: true, boardingLocation: true } },
         },
       },
@@ -146,7 +147,9 @@ export default async function VoucherPage({ params, searchParams }: Props) {
 
   const base = await resolvePublicAppUrl();
   const checkinUrl = `${base}/admin/vouchers/${encodeURIComponent(v.code)}/checkin`;
-  const qrDataUrl = await QRCode.toDataURL(checkinUrl, { margin: 1, scale: 8 });
+  const canValidate = Boolean(v.releasedAt);
+  const qrDataUrl =
+    v.usedAt || !canValidate ? null : await QRCode.toDataURL(checkinUrl, { margin: 1, scale: 8 });
   const label = v.personType === "ADULT" ? `Adulto #${v.personIndex + 1}` : `Criança #${v.personIndex + 1}`;
   const age = v.personType === "CHILD" && v.age != null ? v.age : null;
 
@@ -162,11 +165,24 @@ export default async function VoucherPage({ params, searchParams }: Props) {
 
         <div className="mt-6 grid gap-4 rounded-xl border border-[var(--card-border)] bg-[var(--igh-surface)] p-4">
           <div className="flex flex-col items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qrDataUrl} alt="QR Code do voucher" className="h-64 w-64 rounded-lg border border-[var(--card-border)] bg-white object-contain" />
-            <div className="text-xs text-[var(--text-muted)]">
-              Apresente este QR Code na entrada para validação pelo administrador.
-            </div>
+            {v.usedAt ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+                Este voucher já foi utilizado. O QR Code não está mais disponível.
+              </div>
+            ) : !canValidate ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+                Este ingresso ainda não está liberado. O valor pendente da reserva precisa estar{" "}
+                <strong>100% quitado</strong> para liberar validação.
+              </div>
+            ) : (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={qrDataUrl ?? undefined} alt="QR Code do voucher" className="h-64 w-64 rounded-lg border border-[var(--card-border)] bg-white object-contain" />
+                <div className="text-xs text-[var(--text-muted)]">
+                  Apresente este QR Code na entrada para validação pelo administrador.
+                </div>
+              </>
+            )}
           </div>
 
           <div>

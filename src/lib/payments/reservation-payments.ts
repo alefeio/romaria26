@@ -2,6 +2,7 @@ import "server-only";
 
 import { Prisma } from "@/generated/prisma/client";
 import type { PrismaClient, ReservationPaymentStatus } from "@/generated/prisma/client";
+import { releaseReservationVouchersIfPaid } from "@/lib/vouchers/voucher-release";
 
 /** Cliente Prisma dentro de `$transaction` (sem métodos de infraestrutura). */
 export type ReservationDbClient = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">;
@@ -37,6 +38,11 @@ export async function recalcReservationPaymentStatus(tx: ReservationDbClient, re
     },
     select: { id: true, totalPaid: true, paymentStatus: true },
   });
+
+  if (status === "PAID") {
+    await releaseReservationVouchersIfPaid(tx, reservationId);
+  }
+
   return updated;
 }
 
