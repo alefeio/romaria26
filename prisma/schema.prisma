@@ -107,6 +107,9 @@ model Reservation {
   totalPrice                    Decimal           @db.Decimal(12, 2)
   amountAdultSnapshot           Decimal           @db.Decimal(12, 2) @default(0)
   amountChildSnapshot           Decimal           @db.Decimal(12, 2) @default(0)
+  /** Desconto concedido pelo admin (subtraído de totalPrice para obter totalDue). */
+  discountAmount                Decimal           @db.Decimal(12, 2) @default(0)
+  discountNote                  String?           @db.Text
   totalDue                      Decimal           @db.Decimal(12, 2) @default(0)
   totalPaid                     Decimal           @db.Decimal(12, 2) @default(0)
   paymentStatus                 ReservationPaymentStatus @default(UNPAID)

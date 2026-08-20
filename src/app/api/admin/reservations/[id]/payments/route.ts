@@ -42,6 +42,8 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       totalPaid: reservation.totalPaid.toString(),
       paymentStatus: reservation.paymentStatus,
       totalPrice: reservation.totalPrice.toString(),
+      discountAmount: reservation.discountAmount.toString(),
+      discountNote: reservation.discountNote,
     },
     payments: reservation.payments.map((p) => ({
       id: p.id,

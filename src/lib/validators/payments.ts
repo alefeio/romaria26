@@ -44,3 +44,8 @@ export const adminPatchInstallmentSchema = z.object({
   receiptUrl: z.string().max(2000).optional().nullable(),
 });
 
+export const adminReservationDiscountSchema = z.object({
+  amount: decimalLike,
+  note: z.string().max(2000).optional().nullable(),
+});
+

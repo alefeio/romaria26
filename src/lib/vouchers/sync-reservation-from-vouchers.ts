@@ -2,6 +2,7 @@ import "server-only";
 
 import type { ReservationDbClient } from "@/lib/payments/reservation-payments";
 import { recalcReservationPaymentStatus } from "@/lib/payments/reservation-payments";
+import { computeReservationTotalDue } from "@/lib/payments/reservation-discount";
 import { computeReservationPricingFromVouchers } from "@/lib/vouchers/sync-reservation-pricing";
 import { releaseReservationVouchersIfPaid } from "@/lib/vouchers/voucher-release";
 
@@ -23,6 +24,7 @@ export async function syncReservationFromVouchers(tx: ReservationDbClient, reser
       breakfastKitUnitPriceSnapshot: true,
       adultCourtesySelections: true,
       childrenCourtesySelections: true,
+      discountAmount: true,
     },
   });
   if (!reservation) return null;
@@ -41,6 +43,7 @@ export async function syncReservationFromVouchers(tx: ReservationDbClient, reser
   });
 
   const pricing = computeReservationPricingFromVouchers(vouchers, reservation);
+  const totalDue = computeReservationTotalDue(pricing.totalPrice, reservation.discountAmount);
 
   const updated = await tx.reservation.update({
     where: { id: reservationId },
@@ -59,7 +62,7 @@ export async function syncReservationFromVouchers(tx: ReservationDbClient, reser
       includesBreakfastKit: pricing.includesBreakfastKit,
       breakfastSelections: pricing.breakfastSelections,
       totalPrice: pricing.totalPrice,
-      totalDue: pricing.totalPrice,
+      totalDue,
     },
     select: {
       id: true,

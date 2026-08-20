@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Table, Td, Th } from "@/components/ui/Table";
 import type { ApiResponse } from "@/lib/api-types";
+import { ReservationDiscountButton } from "../reservation-discount-button";
 
 type Payment = {
   id: string;
@@ -56,6 +57,8 @@ type ReservationHeader = {
   totalPaid: string;
   paymentStatus: string;
   totalPrice: string;
+  discountAmount: string;
+  discountNote: string | null;
 };
 
 export default function AdminReservaPagamentosPage() {
@@ -124,6 +127,16 @@ export default function AdminReservaPagamentosPage() {
 
   const remainingAmountText = useMemo(() => remaining.toFixed(2), [remaining]);
   const isFullyPaid = remaining <= 0;
+
+  const discountValue = useMemo(
+    () => Number.parseFloat(header?.discountAmount ?? "0") || 0,
+    [header?.discountAmount]
+  );
+
+  const subtotalValue = useMemo(
+    () => Number.parseFloat(header?.totalPrice ?? "0") || 0,
+    [header?.totalPrice]
+  );
 
   const scheduledInstallments = useMemo(
     () => installments.filter((i) => i.status === "SCHEDULED"),
@@ -325,9 +338,14 @@ export default function AdminReservaPagamentosPage() {
 
   return (
     <div className="py-6">
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <Link href="/admin/reservas" className="text-sm text-[var(--igh-primary)] hover:underline">
           ← Reservas
+        </Link>
+        <Link href={`/admin/reservas/${id}`}>
+          <Button type="button" variant="secondary" size="sm">
+            Voltar
+          </Button>
         </Link>
       </div>
 
@@ -354,8 +372,17 @@ export default function AdminReservaPagamentosPage() {
                   {header.paymentStatus}
                 </Badge>
                 <div className="mt-2 text-sm">
+                  <div className="text-[var(--text-muted)]">
+                    Subtotal:{" "}
+                    {subtotalValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </div>
+                  {discountValue > 0 ? (
+                    <div className="text-emerald-700 dark:text-emerald-300">
+                      Desconto: −{discountValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </div>
+                  ) : null}
                   <div>
-                    Total:{" "}
+                    Total devido:{" "}
                     <span className="font-semibold">
                       {Number.parseFloat(header.totalDue).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                     </span>
@@ -365,8 +392,20 @@ export default function AdminReservaPagamentosPage() {
                     {Number.parseFloat(header.totalPaid).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} · Falta:{" "}
                     {remaining.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                   </div>
+                  {header.discountNote ? (
+                    <div className="mt-1 text-xs text-[var(--text-muted)]">Motivo do desconto: {header.discountNote}</div>
+                  ) : null}
                 </div>
-                <div className="mt-3 flex justify-end gap-2">
+                <div className="mt-3 flex flex-wrap justify-end gap-2">
+                  {header ? (
+                    <ReservationDiscountButton
+                      reservationId={id}
+                      totalPrice={header.totalPrice}
+                      discountAmount={header.discountAmount}
+                      discountNote={header.discountNote}
+                      onApplied={load}
+                    />
+                  ) : null}
                   <Button
                     type="button"
                     disabled={isFullyPaid}

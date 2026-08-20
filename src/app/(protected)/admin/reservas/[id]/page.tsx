@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { ReservationVouchersManager } from "./reservation-vouchers-manager";
+import { ReservationDiscountButton } from "./reservation-discount-button";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { serializeVoucher } from "@/lib/vouchers/admin-voucher-crud";
@@ -108,11 +109,38 @@ export default async function AdminReservaDetailPage({ params }: Props) {
         </div>
 
         <div className="card">
-          <div className="card-header">Pagamento</div>
+          <div className="card-header flex flex-wrap items-center justify-between gap-2">
+            <span>Pagamento</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <ReservationDiscountButton
+                reservationId={r.id}
+                totalPrice={r.totalPrice.toString()}
+                discountAmount={r.discountAmount.toString()}
+                discountNote={r.discountNote}
+                size="sm"
+              />
+              <Link
+                href={`/admin/reservas/${r.id}/pagamentos`}
+                className="text-xs font-medium text-[var(--igh-primary)] hover:underline"
+              >
+                Gerenciar pagamentos
+              </Link>
+            </div>
+          </div>
           <div className="card-body text-sm">
             <div>
               Status: <span className="font-medium">{r.paymentStatus}</span>
             </div>
+            <div className="mt-1 text-[var(--text-muted)]">
+              Subtotal:{" "}
+              {Number.parseFloat(r.totalPrice.toString()).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            </div>
+            {r.discountAmount.greaterThan(0) ? (
+              <div className="mt-1 text-emerald-700 dark:text-emerald-300">
+                Desconto: −
+                {Number.parseFloat(r.discountAmount.toString()).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              </div>
+            ) : null}
             <div className="mt-1">
               Devido:{" "}
               <span className="font-medium">
@@ -122,6 +150,9 @@ export default async function AdminReservaDetailPage({ params }: Props) {
             <div className="mt-1 text-[var(--text-muted)]">
               Pago: {Number.parseFloat(r.totalPaid.toString()).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
             </div>
+            {r.discountNote ? (
+              <div className="mt-2 text-xs text-[var(--text-muted)]">Motivo do desconto: {r.discountNote}</div>
+            ) : null}
           </div>
         </div>
       </div>
