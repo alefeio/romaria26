@@ -63,6 +63,7 @@ model Package {
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
   reservations          Reservation[]
+  collaborators         EventCollaborator[]
 
   @@index([slug])
   @@index([status, isActive])
@@ -177,16 +178,46 @@ model ReservationVoucher {
 }
 
 model VoucherCodeLedger {
-  id          String   @id @default(uuid())
-  codeNumber  Int      @unique
-  code        String   @unique
-  rangeFrom   Int
-  rangeTo     Int
-  voucherId   String?  @unique
-  allocatedAt DateTime @default(now())
-  voucher     ReservationVoucher? @relation(fields: [voucherId], references: [id], onDelete: SetNull)
+  id             String   @id @default(uuid())
+  codeNumber     Int      @unique
+  code           String   @unique
+  rangeFrom      Int
+  rangeTo        Int
+  voucherId      String?  @unique
+  collaboratorId String?  @unique
+  allocatedAt    DateTime @default(now())
+  voucher        ReservationVoucher? @relation(fields: [voucherId], references: [id], onDelete: SetNull)
+  collaborator   EventCollaborator?  @relation(fields: [collaboratorId], references: [id], onDelete: SetNull)
 
   @@index([rangeFrom, rangeTo])
+}
+
+/** Colaborador do evento (equipe). Voucher na faixa 3001–4000, separado dos clientes. */
+model EventCollaborator {
+  id              String   @id @default(uuid())
+  packageId       String
+  name            String
+  email           String
+  phone           String?
+  /** Função no evento (ex.: segurança, cozinha). */
+  roleLabel       String?
+  shirtSize       String?
+  notes           String?
+  codeNumber      Int
+  code            String   @unique
+  usedAt          DateTime?
+  voidedAt        DateTime?
+  emailedAt       DateTime?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  package         Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  codeLedger      VoucherCodeLedger?
+
+  @@unique([packageId, codeNumber])
+  @@index([packageId])
+  @@index([voidedAt])
+  @@index([email])
 }
 
 model ReservationVoucherShare {

@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { BRAZIL_TIMEZONE } from "@/lib/datetime-brazil";
 import { getSessionUserFromCookie, verifyPassword } from "@/lib/auth";
 import { resolvePublicAppUrl } from "@/lib/email";
+import { findVoucherByCode } from "@/lib/vouchers/find-voucher-by-code";
 
 type Props = { params: Promise<{ code: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
@@ -53,21 +54,80 @@ export default async function VoucherPage({ params, searchParams }: Props) {
   const sharedId = typeof sp.s === "string" ? sp.s.trim() : "";
   const sharedPass = typeof sp.p === "string" ? sp.p.trim() : "";
 
-  const v = await prisma.reservationVoucher.findFirst({
-    where: { code: c },
-    include: {
-      reservation: {
-        select: {
-          id: true,
-          customerNameSnapshot: true,
-          userId: true,
-          paymentStatus: true,
-          package: { select: { name: true, departureDate: true, departureTime: true, boardingLocation: true } },
-        },
-      },
-    },
-  });
-  if (!v) notFound();
+  const resolved = await findVoucherByCode(c);
+  if (!resolved) notFound();
+
+  if (resolved.kind === "collaborator") {
+    const collab = resolved.collaborator;
+    const base = await resolvePublicAppUrl();
+    const checkinUrl = `${base}/admin/vouchers/${encodeURIComponent(collab.code)}/checkin`;
+    const qrDataUrl =
+      collab.usedAt ? null : await QRCode.toDataURL(checkinUrl, { margin: 1, scale: 8 });
+
+    return (
+      <main className="mx-auto max-w-xl px-4 py-10">
+        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Voucher de colaborador
+          </div>
+          <h1 className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{collab.package.name}</h1>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            {formatWhen(collab.package.departureDate, collab.package.departureTime)} · Embarque:{" "}
+            {collab.package.boardingLocation}
+          </p>
+
+          <div className="mt-6 grid gap-4 rounded-xl border border-[var(--card-border)] bg-[var(--igh-surface)] p-4">
+            <div className="flex flex-col items-center gap-2">
+              {collab.usedAt ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+                  Este voucher já foi utilizado. O QR Code não está mais disponível.
+                </div>
+              ) : (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={qrDataUrl ?? undefined}
+                    alt="QR Code do voucher"
+                    className="h-64 w-64 rounded-lg border border-[var(--card-border)] bg-white object-contain"
+                  />
+                  <div className="text-xs text-[var(--text-muted)]">
+                    Apresente este QR Code na entrada para validação pela equipe.
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div>
+              <div className="text-xs text-[var(--text-muted)]">Colaborador</div>
+              <div className="text-lg font-semibold text-[var(--text-primary)]">{collab.name}</div>
+              {collab.roleLabel ? (
+                <div className="mt-1 text-sm text-[var(--text-secondary)]">Função: {collab.roleLabel}</div>
+              ) : null}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              {collab.shirtSize ? (
+                <div>
+                  <div className="text-xs text-[var(--text-muted)]">Camisa</div>
+                  <div className="font-medium text-[var(--text-primary)]">{collab.shirtSize}</div>
+                </div>
+              ) : null}
+              <div>
+                <div className="text-xs text-[var(--text-muted)]">Número</div>
+                <div className="font-mono font-semibold text-[var(--text-primary)]">{collab.code}</div>
+              </div>
+            </div>
+          </div>
+
+          <p className="mt-6 text-sm text-[var(--text-muted)]">
+            Status de uso: <span className="font-medium">{collab.usedAt ? "Usado" : "Não usado"}</span>
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  const v = resolved.voucher;
 
   const hasAnyShareParam = Boolean(sharedId || sharedPass);
   const hasFullShareParams = Boolean(sharedId && sharedPass);

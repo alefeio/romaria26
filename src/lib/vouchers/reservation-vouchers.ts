@@ -21,6 +21,8 @@ export const VOUCHER_RANGES = {
   ADULT_WITH_KIT: { from: 1, to: 1000 },
   ADULT_NO_KIT: { from: 1001, to: 2000 },
   CHILD: { from: 2001, to: 3000 },
+  /** Equipe/colaboradores do evento — sequência após crianças. */
+  COLLABORATOR: { from: 3001, to: 4000 },
 } as const;
 
 export function formatVoucherCode(n: number): string {
@@ -60,10 +62,17 @@ export async function allocateNextVoucherNumber(
   return allocated.codeNumber;
 }
 
-export async function linkVoucherCodeLedger(tx: TxClient, codeNumber: number, voucherId: string) {
+export async function linkVoucherCodeLedger(
+  tx: TxClient,
+  codeNumber: number,
+  link: { voucherId?: string; collaboratorId?: string }
+) {
   await tx.voucherCodeLedger.update({
     where: { codeNumber },
-    data: { voucherId },
+    data: {
+      voucherId: link.voucherId,
+      collaboratorId: link.collaboratorId,
+    },
   });
 }
 
@@ -171,7 +180,7 @@ export async function ensureReservationVouchersTx(tx: TxClient, reservationId: s
           optionalShirtPrice: row.optionalShirtPrice ?? undefined,
         },
       });
-      await linkVoucherCodeLedger(tx, codeNumber, created.id);
+      await linkVoucherCodeLedger(tx, codeNumber, { voucherId: created.id });
     }
 
     const vouchers = await tx.reservationVoucher.findMany({

@@ -151,7 +151,7 @@ export async function createReservationVoucherAdmin(
       optionalShirtPrice: shirtFields.optionalShirtPrice ?? undefined,
     },
   });
-  await linkVoucherCodeLedger(tx, codeNumber, row.id);
+  await linkVoucherCodeLedger(tx, codeNumber, { voucherId: row.id });
 
   const totals = await syncReservationFromVouchers(tx, reservationId);
 
@@ -260,7 +260,7 @@ export async function updateReservationVoucherAdmin(
   });
 
   if (rangeChanged && codeNumber != null) {
-    await linkVoucherCodeLedger(tx, codeNumber, row.id);
+    await linkVoucherCodeLedger(tx, codeNumber, { voucherId: row.id });
   }
 
   const totals = await syncReservationFromVouchers(tx, reservationId);
