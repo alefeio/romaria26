@@ -9,6 +9,8 @@ export type BillingVoucherStats = {
   paidChildren: number;
   unpaidChildren: number;
   kits: number;
+  optionalShirts: number;
+  optionalShirtsAmount: string;
 };
 
 export const EMPTY_VOUCHER_STATS: BillingVoucherStats = {
@@ -17,6 +19,8 @@ export const EMPTY_VOUCHER_STATS: BillingVoucherStats = {
   paidChildren: 0,
   unpaidChildren: 0,
   kits: 0,
+  optionalShirts: 0,
+  optionalShirtsAmount: "0",
 };
 
 type ReservationVoucherWhere = Prisma.ReservationVoucherWhereInput;
@@ -31,6 +35,7 @@ export async function loadBillingVoucherStats(
 ): Promise<BillingVoucherStats> {
   const where: ReservationVoucherWhere = {
     reservation: reservationWhere,
+    voidedAt: null,
   };
 
   const vouchers = await prisma.reservationVoucher.findMany({
@@ -40,6 +45,8 @@ export async function loadBillingVoucherStats(
       personIndex: true,
       age: true,
       hasBreakfastKit: true,
+      hasOptionalPaidShirt: true,
+      optionalShirtPrice: true,
       reservation: {
         select: {
           childrenCourtesySelections: true,
@@ -52,6 +59,8 @@ export async function loadBillingVoucherStats(
   let paidChildren = 0;
   let unpaidChildren = 0;
   let kits = 0;
+  let optionalShirts = 0;
+  let optionalShirtsAmount = 0;
 
   for (const v of vouchers) {
     if (v.personType === "ADULT") {
@@ -64,6 +73,11 @@ export async function loadBillingVoucherStats(
     const isCourtesy = Boolean(v.reservation.childrenCourtesySelections[v.personIndex]);
     if (age >= 6 && !isCourtesy) paidChildren += 1;
     else unpaidChildren += 1;
+
+    if (v.hasOptionalPaidShirt && v.optionalShirtPrice) {
+      optionalShirts += 1;
+      optionalShirtsAmount += Number.parseFloat(v.optionalShirtPrice.toString());
+    }
   }
 
   return {
@@ -72,5 +86,7 @@ export async function loadBillingVoucherStats(
     paidChildren,
     unpaidChildren,
     kits,
+    optionalShirts,
+    optionalShirtsAmount: optionalShirtsAmount.toFixed(2),
   };
 }

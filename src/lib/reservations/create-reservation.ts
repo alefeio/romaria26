@@ -26,6 +26,8 @@ export type CreateReservationInput = {
   childrenAges: number[];
   childrenShirtNumbers: number[];
   childrenCourtesySelections?: boolean[];
+  childrenOptionalShirtIncluded?: boolean[];
+  childrenOptionalShirtPrices?: number[];
   breakfastSelections: boolean[];
   breakfastKitSelections: boolean[];
   paymentPreferenceMethod?: string | null;
@@ -84,6 +86,8 @@ export async function createReservationInTransaction(
     childrenAges,
     childrenShirtNumbers,
     childrenCourtesySelections,
+    childrenOptionalShirtIncluded,
+    childrenOptionalShirtPrices,
     breakfastSelections,
     breakfastKitSelections,
     paymentPreferenceMethod,
@@ -160,16 +164,51 @@ export async function createReservationInTransaction(
     );
   }
   const childNums = childrenShirtNumbers.map((n) => (typeof n === "number" ? n : Number(n)));
-  if (childNums.some((n) => !Number.isInteger(n) || n <= 0 || n > 120)) {
-    throw new ReservationCreateError(
-      "INVALID_CUSTOMER_DATA",
-      "Número/tamanho da camisa das crianças deve ser um inteiro (ex.: 6, 8, 10, 12)."
-    );
-  }
   const childCourtesies =
     Array.isArray(childrenCourtesySelections) && childrenCourtesySelections.length === childrenCount
       ? childrenCourtesySelections.map((v) => Boolean(v))
       : Array.from({ length: childrenCount }, () => false);
+  const childOptionalIncluded =
+    Array.isArray(childrenOptionalShirtIncluded) && childrenOptionalShirtIncluded.length === childrenCount
+      ? childrenOptionalShirtIncluded.map((v) => Boolean(v))
+      : Array.from({ length: childrenCount }, () => false);
+  const childOptionalPrices =
+    Array.isArray(childrenOptionalShirtPrices) && childrenOptionalShirtPrices.length === childrenCount
+      ? childrenOptionalShirtPrices.map((n) => (typeof n === "number" ? n : Number(n)))
+      : Array.from({ length: childrenCount }, () => 0);
+
+  for (let i = 0; i < childrenCount; i++) {
+    const age = childAgeNums[i] ?? 0;
+    const courtesy = childCourtesies[i];
+    const optionalIncluded = childOptionalIncluded[i];
+    const optionalPrice = childOptionalPrices[i] ?? 0;
+    const freeChild = age < 6 && !courtesy;
+
+    if (freeChild) {
+      if (optionalIncluded) {
+        if (!Number.isInteger(childNums[i]) || childNums[i] <= 0 || childNums[i] > 120) {
+          throw new ReservationCreateError(
+            "INVALID_CUSTOMER_DATA",
+            "Para criança gratuita com camisa opcional, informe o tamanho da camisa (número)."
+          );
+        }
+        if (!Number.isFinite(optionalPrice) || optionalPrice <= 0) {
+          throw new ReservationCreateError(
+            "INVALID_CUSTOMER_DATA",
+            "Informe o valor da camisa opcional para a criança gratuita."
+          );
+        }
+      }
+      continue;
+    }
+
+    if (!Number.isInteger(childNums[i]) || childNums[i] <= 0 || childNums[i] > 120) {
+      throw new ReservationCreateError(
+        "INVALID_CUSTOMER_DATA",
+        "Número/tamanho da camisa das crianças deve ser um inteiro (ex.: 6, 8, 10, 12)."
+      );
+    }
+  }
 
   if (!Array.isArray(breakfastSelections) || breakfastSelections.length !== quantity) {
     throw new ReservationCreateError(
@@ -286,7 +325,18 @@ export async function createReservationInTransaction(
     const kitCount = kits.filter(Boolean).length;
     const paidAdultsCount = adultCourtesies.filter((isCourtesy) => !isCourtesy).length;
     const paidChildrenCount = childAgeNums.filter((age, index) => age >= 6 && !childCourtesies[index]).length;
-    const totalPrice = adultUnit.mul(paidAdultsCount).add(childUnit.mul(paidChildrenCount)).add(breakfastUnit.mul(kitCount));
+    let optionalShirtTotal = new Prisma.Decimal(0);
+    for (let i = 0; i < childrenCount; i++) {
+      const age = childAgeNums[i] ?? 0;
+      if (age < 6 && !childCourtesies[i] && childOptionalIncluded[i] && (childOptionalPrices[i] ?? 0) > 0) {
+        optionalShirtTotal = optionalShirtTotal.add(childOptionalPrices[i] ?? 0);
+      }
+    }
+    const totalPrice = adultUnit
+      .mul(paidAdultsCount)
+      .add(childUnit.mul(paidChildrenCount))
+      .add(breakfastUnit.mul(kitCount))
+      .add(optionalShirtTotal);
     const totalDue = totalPrice;
 
     const now = new Date();
@@ -309,6 +359,8 @@ export async function createReservationInTransaction(
         childrenAges: childAgeNums,
         childrenShirtNumbers: childNums,
         childrenCourtesySelections: childCourtesies,
+        childrenOptionalShirtIncluded: childOptionalIncluded,
+        childrenOptionalShirtPrices: childOptionalPrices,
         breakfastSelections: breakfasts,
         breakfastKitSelections: kits,
         includesBreakfastKit: kits.some(Boolean),

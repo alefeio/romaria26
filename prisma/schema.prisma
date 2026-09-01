@@ -92,6 +92,9 @@ model Reservation {
   childrenShirtNumbers          Int[]             @default([])
   /** Cortesia por criança (mesma ordem das crianças). */
   childrenCourtesySelections     Boolean[]         @default([])
+  /** Criança gratuita (< 6 anos): camisa opcional paga à parte. */
+  childrenOptionalShirtIncluded  Boolean[]         @default([])
+  childrenOptionalShirtPrices      Float[]           @default([])
   /** Café da manhã marcado por ingresso (adultos + crianças, nesta ordem: adultos primeiro). */
   breakfastSelections           Boolean[]         @default([])
   /** Kit café (pago) marcado por adulto (mesma ordem dos adultos). */
@@ -147,8 +150,13 @@ model ReservationVoucher {
   age           Int?
   shirtSize     String
   hasBreakfastKit Boolean @default(false)
+  /** Criança gratuita: camisa extra cobrada à parte. */
+  hasOptionalPaidShirt Boolean @default(false)
+  optionalShirtPrice   Decimal? @db.Decimal(12, 2)
   createdAt     DateTime @default(now())
   usedAt        DateTime?
+  /** Anulado (número permanece no ledger; não reutilizar). */
+  voidedAt      DateTime?
   /** Liberado para uso (QR/check-in/e-mail) após quitação correspondente. */
   releasedAt    DateTime?
   /** Data/hora em que este voucher entrou em uma exportação (PDF). */
@@ -156,14 +164,29 @@ model ReservationVoucher {
   /** Usuário (admin/master) que realizou a exportação. */
   exportedByUserId String?
   shares        ReservationVoucherShare[]
+  codeLedger    VoucherCodeLedger?
   reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
 
   @@index([reservationId])
   @@index([packageId])
   @@index([code])
   @@index([exportedAt])
+  @@index([voidedAt])
   @@unique([reservationId, personType, personIndex])
   @@unique([packageId, codeNumber])
+}
+
+model VoucherCodeLedger {
+  id          String   @id @default(uuid())
+  codeNumber  Int      @unique
+  code        String   @unique
+  rangeFrom   Int
+  rangeTo     Int
+  voucherId   String?  @unique
+  allocatedAt DateTime @default(now())
+  voucher     ReservationVoucher? @relation(fields: [voucherId], references: [id], onDelete: SetNull)
+
+  @@index([rangeFrom, rangeTo])
 }
 
 model ReservationVoucherShare {

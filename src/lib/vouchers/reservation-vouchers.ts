@@ -13,6 +13,9 @@ import type { SendEmailAttachment } from "@/lib/email";
 import { sendEmailAndRecord } from "@/lib/email/send-and-record";
 import { getEmailBranding, wrapBrandedEmail } from "@/lib/email/branding";
 import { releaseReservationVouchersIfPaid } from "@/lib/vouchers/voucher-release";
+import { NO_SHIRT_LABEL, isFreeChildAge } from "@/lib/vouchers/shirt";
+
+export const ACTIVE_VOUCHER_FILTER = { voidedAt: null } as const;
 
 export const VOUCHER_RANGES = {
   ADULT_WITH_KIT: { from: 1, to: 1000 },
@@ -27,22 +30,41 @@ export function formatVoucherCode(n: number): string {
 type TxClient = Parameters<typeof prisma.$transaction>[0] extends (arg: infer T) => any ? T : never;
 
 /**
- * Próximo número sequencial na faixa, global (todos os lotes/pacotes).
- * O campo `code` é único no banco; numeração reiniciada por pacote geraria colisão (ex.: 0001 no lote 2).
+ * Próximo código na faixa via ledger permanente (nunca reutiliza números cancelados/excluídos).
  */
-export async function allocateNextVoucherNumber(
+export async function allocateNextVoucherCode(
   tx: TxClient,
   range: { from: number; to: number }
-): Promise<number> {
-  const maxRow = await tx.reservationVoucher.aggregate({
-    where: { codeNumber: { gte: range.from, lte: range.to } },
+): Promise<{ codeNumber: number; code: string }> {
+  const maxRow = await tx.voucherCodeLedger.aggregate({
+    where: { rangeFrom: range.from, rangeTo: range.to },
     _max: { codeNumber: true },
   });
   const next = (maxRow._max.codeNumber ?? range.from - 1) + 1;
   if (next > range.to) {
     throw new Error(`Faixa de vouchers esgotada (${range.from}-${range.to}).`);
   }
-  return next;
+  const code = formatVoucherCode(next);
+  await tx.voucherCodeLedger.create({
+    data: { codeNumber: next, code, rangeFrom: range.from, rangeTo: range.to },
+  });
+  return { codeNumber: next, code };
+}
+
+/** @deprecated Use allocateNextVoucherCode */
+export async function allocateNextVoucherNumber(
+  tx: TxClient,
+  range: { from: number; to: number }
+): Promise<number> {
+  const allocated = await allocateNextVoucherCode(tx, range);
+  return allocated.codeNumber;
+}
+
+export async function linkVoucherCodeLedger(tx: TxClient, codeNumber: number, voucherId: string) {
+  await tx.voucherCodeLedger.update({
+    where: { codeNumber },
+    data: { voucherId },
+  });
 }
 
 export async function ensureReservationVouchersTx(tx: TxClient, reservationId: string) {
@@ -59,6 +81,8 @@ export async function ensureReservationVouchersTx(tx: TxClient, reservationId: s
         childrenNames: true,
         childrenAges: true,
         childrenShirtNumbers: true,
+        childrenOptionalShirtIncluded: true,
+        childrenOptionalShirtPrices: true,
       },
     });
     if (!reservation) return null;
@@ -67,7 +91,7 @@ export async function ensureReservationVouchersTx(tx: TxClient, reservationId: s
     if (expected <= 0) return { reservation, vouchers: [] as const };
 
     const existing = await tx.reservationVoucher.findMany({
-      where: { reservationId },
+      where: { reservationId, ...ACTIVE_VOUCHER_FILTER },
       orderBy: [{ personType: "asc" }, { personIndex: "asc" }],
     });
 
@@ -81,6 +105,8 @@ export async function ensureReservationVouchersTx(tx: TxClient, reservationId: s
       age: number | null;
       shirtSize: string;
       hasBreakfastKit: boolean;
+      hasOptionalPaidShirt: boolean;
+      optionalShirtPrice: number | null;
     }> = [];
 
     for (let i = 0; i < reservation.adultsCount; i++) {
@@ -93,19 +119,29 @@ export async function ensureReservationVouchersTx(tx: TxClient, reservationId: s
         age: null,
         shirtSize: reservation.adultShirtSizes[i] ?? "",
         hasBreakfastKit: Boolean(reservation.breakfastKitSelections[i]),
+        hasOptionalPaidShirt: false,
+        optionalShirtPrice: null,
       });
     }
 
     for (let i = 0; i < reservation.childrenCount; i++) {
       const key = `CHILD:${i}`;
       if (byKey.has(key)) continue;
+      const age = Number.isInteger(reservation.childrenAges[i]) ? reservation.childrenAges[i]! : null;
+      const optionalIncluded = Boolean(reservation.childrenOptionalShirtIncluded[i]);
+      const optionalPrice = reservation.childrenOptionalShirtPrices[i] ?? 0;
+      const freeChild = isFreeChildAge(age);
+      const hasOptionalPaidShirt = freeChild && optionalIncluded && optionalPrice > 0;
+      const shirtNum = reservation.childrenShirtNumbers[i] ?? 0;
       toCreate.push({
         personType: "CHILD",
         personIndex: i,
         name: reservation.childrenNames[i] ?? "",
-        age: Number.isInteger(reservation.childrenAges[i]) ? reservation.childrenAges[i]! : null,
-        shirtSize: String(reservation.childrenShirtNumbers[i] ?? ""),
+        age,
+        shirtSize: hasOptionalPaidShirt ? String(shirtNum) : freeChild ? NO_SHIRT_LABEL : String(shirtNum),
         hasBreakfastKit: false,
+        hasOptionalPaidShirt,
+        optionalShirtPrice: hasOptionalPaidShirt ? optionalPrice : null,
       });
     }
 
@@ -117,10 +153,9 @@ export async function ensureReservationVouchersTx(tx: TxClient, reservationId: s
             ? VOUCHER_RANGES.ADULT_WITH_KIT
             : VOUCHER_RANGES.ADULT_NO_KIT;
 
-      const codeNumber = await allocateNextVoucherNumber(tx, range);
-      const code = formatVoucherCode(codeNumber);
+      const { codeNumber, code } = await allocateNextVoucherCode(tx, range);
 
-      await tx.reservationVoucher.create({
+      const created = await tx.reservationVoucher.create({
         data: {
           reservationId,
           packageId: reservation.packageId,
@@ -132,12 +167,15 @@ export async function ensureReservationVouchersTx(tx: TxClient, reservationId: s
           age: row.age ?? undefined,
           shirtSize: row.shirtSize,
           hasBreakfastKit: row.hasBreakfastKit,
+          hasOptionalPaidShirt: row.hasOptionalPaidShirt,
+          optionalShirtPrice: row.optionalShirtPrice ?? undefined,
         },
       });
+      await linkVoucherCodeLedger(tx, codeNumber, created.id);
     }
 
     const vouchers = await tx.reservationVoucher.findMany({
-      where: { reservationId },
+      where: { reservationId, ...ACTIVE_VOUCHER_FILTER },
       orderBy: [{ personType: "asc" }, { personIndex: "asc" }],
     });
 

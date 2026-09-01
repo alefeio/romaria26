@@ -31,7 +31,7 @@ export default async function AdminReservaDetailPage({ params }: Props) {
     include: {
       user: { select: { id: true, name: true, email: true } },
       package: { select: { id: true, name: true, slug: true, departureDate: true, departureTime: true, boardingLocation: true } },
-      vouchers: { orderBy: [{ personType: "asc" }, { personIndex: "asc" }] },
+      vouchers: { where: { voidedAt: null }, orderBy: [{ personType: "asc" }, { personIndex: "asc" }] },
     },
   });
 
@@ -98,7 +98,21 @@ export default async function AdminReservaDetailPage({ params }: Props) {
               <div className="mt-2 text-xs text-[var(--text-muted)]">Camisas adultos: {r.adultShirtSizes.join(", ")}</div>
             ) : null}
             {r.childrenShirtNumbers?.length ? (
-              <div className="mt-1 text-xs text-[var(--text-muted)]">Camisas crianças (nº): {r.childrenShirtNumbers.join(", ")}</div>
+              <div className="mt-1 text-xs text-[var(--text-muted)]">
+                Camisas crianças:{" "}
+                {r.childrenAges.map((age, i) => {
+                  const courtesy = r.childrenCourtesySelections[i];
+                  const free = age < 6 && !courtesy;
+                  const optional = Boolean(r.childrenOptionalShirtIncluded[i]);
+                  const price = r.childrenOptionalShirtPrices[i] ?? 0;
+                  if (free && optional && price > 0) {
+                    const shirtNum = r.childrenShirtNumbers[i];
+                    return `C${i + 1}: tamanho ${shirtNum} (camisa opcional ${Number(price).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })})`;
+                  }
+                  if (free) return `C${i + 1}: Sem camisa`;
+                  return `C${i + 1}: nº ${r.childrenShirtNumbers[i]}`;
+                }).join(" · ")}
+              </div>
             ) : null}
             {r.breakfastKitSelections?.length ? (
               <div className="mt-1 text-xs text-[var(--text-muted)]">

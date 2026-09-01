@@ -23,7 +23,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
     include: {
       payments: { orderBy: [{ paidAt: "desc" }] },
       installments: { orderBy: [{ dueDate: "asc" }] },
-      vouchers: { orderBy: [{ personType: "asc" }, { personIndex: "asc" }] },
+      vouchers: { where: { voidedAt: null }, orderBy: [{ personType: "asc" }, { personIndex: "asc" }] },
       package: { select: { id: true, name: true, slug: true, departureDate: true } },
       user: { select: { id: true, name: true, email: true } },
     },

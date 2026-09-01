@@ -4,6 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "./Button";
 
+const NO_SHIRT_LABEL = "Sem camisa";
+
+function isFreeChild(age: number, courtesy: boolean): boolean {
+  return age < 6 && !courtesy;
+}
+
 type Props = {
   packageId: string;
   slug: string;
@@ -79,6 +85,8 @@ export function PackageReservationForm({
   const [childrenAges, setChildrenAges] = useState<number[]>([]);
   const [childrenShirtNumbers, setChildrenShirtNumbers] = useState<number[]>([]);
   const [childrenCourtesySelections, setChildrenCourtesySelections] = useState<boolean[]>([]);
+  const [childrenOptionalShirtIncluded, setChildrenOptionalShirtIncluded] = useState<boolean[]>([]);
+  const [childrenOptionalShirtPrices, setChildrenOptionalShirtPrices] = useState<number[]>([]);
   const [breakfastKitSelections, setBreakfastKitSelections] = useState<boolean[]>([false]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
@@ -136,6 +144,16 @@ export function PackageReservationForm({
       while (next.length < childrenCount) next.push(false);
       return next;
     });
+    setChildrenOptionalShirtIncluded((prev) => {
+      const next = prev.slice(0, childrenCount);
+      while (next.length < childrenCount) next.push(false);
+      return next;
+    });
+    setChildrenOptionalShirtPrices((prev) => {
+      const next = prev.slice(0, childrenCount);
+      while (next.length < childrenCount) next.push(0);
+      return next;
+    });
     setBreakfastKitSelections((prev) => {
       const next = prev.slice(0, adultsCount);
       while (next.length < adultsCount) next.push(false);
@@ -167,7 +185,14 @@ export function PackageReservationForm({
     const paidChildrenCount = childrenAges
       .slice(0, childrenCount)
       .filter((age, index) => Number.isInteger(age) && age >= 6 && !childrenCourtesySelections[index]).length;
-    const total = adultUnit * paidAdultsCount + childUnit * paidChildrenCount + kitUnit * kitCount;
+    const optionalShirtTotal = isAdminForCustomer
+      ? childrenAges.slice(0, childrenCount).reduce((sum, age, index) => {
+          if (!isFreeChild(age, childrenCourtesySelections[index] ?? false)) return sum;
+          if (!childrenOptionalShirtIncluded[index]) return sum;
+          return sum + (childrenOptionalShirtPrices[index] ?? 0);
+        }, 0)
+      : 0;
+    const total = adultUnit * paidAdultsCount + childUnit * paidChildrenCount + kitUnit * kitCount + optionalShirtTotal;
     return total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   }, [
     unitPrice,
@@ -176,6 +201,9 @@ export function PackageReservationForm({
     breakfastKitSelections,
     adultCourtesySelections,
     childrenCourtesySelections,
+    childrenOptionalShirtIncluded,
+    childrenOptionalShirtPrices,
+    isAdminForCustomer,
     adultsCount,
     childrenAges,
     childrenCount,
@@ -207,10 +235,42 @@ export function PackageReservationForm({
       }
     }
     if (childrenCount > 0) {
-      const invalidChild = childrenShirtNumbers.some((n) => !Number.isInteger(n) || n <= 0);
-      if (invalidChild) {
-        setMessage({ type: "err", text: "Informe o número/tamanho da camisa para cada criança (ex.: 6, 8, 10, 12)." });
-        return;
+      for (let cidx = 0; cidx < childrenCount; cidx++) {
+        const age = childrenAges[cidx] ?? 0;
+        const courtesy = childrenCourtesySelections[cidx] ?? false;
+        const free = isFreeChild(age, courtesy);
+        const optionalIncluded = isAdminForCustomer && Boolean(childrenOptionalShirtIncluded[cidx]);
+
+        if (free && optionalIncluded) {
+          const shirtNum = childrenShirtNumbers[cidx] ?? 0;
+          const price = childrenOptionalShirtPrices[cidx] ?? 0;
+          if (!Number.isInteger(shirtNum) || shirtNum <= 0) {
+            setMessage({
+              type: "err",
+              text: `Criança #${cidx + 1}: informe o tamanho da camisa opcional.`,
+            });
+            return;
+          }
+          if (!Number.isFinite(price) || price <= 0) {
+            setMessage({
+              type: "err",
+              text: `Criança #${cidx + 1}: informe o valor da camisa opcional.`,
+            });
+            return;
+          }
+          continue;
+        }
+
+        if (!free) {
+          const shirtNum = childrenShirtNumbers[cidx] ?? 0;
+          if (!Number.isInteger(shirtNum) || shirtNum <= 0) {
+            setMessage({
+              type: "err",
+              text: "Informe o número/tamanho da camisa para cada criança (ex.: 6, 8, 10, 12).",
+            });
+            return;
+          }
+        }
       }
     }
     const phoneForBooking = useProfilePhone ? profilePhoneDigits : digitsOnly(customerPhoneSnapshot);
@@ -240,6 +300,12 @@ export function PackageReservationForm({
         childrenAges,
         childrenShirtNumbers,
         childrenCourtesySelections,
+        ...(isAdminForCustomer
+          ? {
+              childrenOptionalShirtIncluded,
+              childrenOptionalShirtPrices,
+            }
+          : {}),
         // legado: manter no backend como falso para todos
         breakfastSelections: Array.from({ length: shirtCount }, () => false),
         breakfastKitSelections: breakfastKitAvailable ? breakfastKitSelections : adultShirtSizes.map(() => false),
@@ -532,6 +598,10 @@ export function PackageReservationForm({
                 <div className="text-sm font-medium text-[var(--igh-secondary)]">Crianças</div>
                 <div className="mt-2 space-y-2">
                   {Array.from({ length: childrenCount }, (_, cidx) => {
+                    const age = childrenAges[cidx] ?? 6;
+                    const courtesy = childrenCourtesySelections[cidx] ?? false;
+                    const free = isFreeChild(age, courtesy);
+                    const optionalIncluded = isAdminForCustomer && Boolean(childrenOptionalShirtIncluded[cidx]);
                     return (
                       <div key={`c-${cidx}`} className="rounded-md border border-[var(--igh-border)] bg-[var(--card-bg)] p-3">
                         <div className="flex items-center justify-between gap-3">
@@ -540,13 +610,21 @@ export function PackageReservationForm({
                             <input
                               type="checkbox"
                               checked={childrenCourtesySelections[cidx] ?? false}
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                const checked = e.target.checked;
                                 setChildrenCourtesySelections((prev) => {
                                   const next = prev.slice();
-                                  next[cidx] = e.target.checked;
+                                  next[cidx] = checked;
                                   return next;
-                                })
-                              }
+                                });
+                                if (checked) {
+                                  setChildrenOptionalShirtIncluded((prev) => {
+                                    const next = prev.slice();
+                                    next[cidx] = false;
+                                    return next;
+                                  });
+                                }
+                              }}
                             />
                             Cortesia
                           </label>
@@ -573,13 +651,21 @@ export function PackageReservationForm({
                               required
                               className="mt-1 w-full rounded-lg border border-[var(--igh-border)] bg-[var(--background)] px-3 py-2 text-sm"
                               value={childrenAges[cidx] ?? 6}
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                const nextAge = Number(e.target.value);
                                 setChildrenAges((prev) => {
                                   const next = prev.slice();
-                                  next[cidx] = Number(e.target.value);
+                                  next[cidx] = nextAge;
                                   return next;
-                                })
-                              }
+                                });
+                                if (nextAge >= 6 || childrenCourtesySelections[cidx]) {
+                                  setChildrenOptionalShirtIncluded((prev) => {
+                                    const next = prev.slice();
+                                    next[cidx] = false;
+                                    return next;
+                                  });
+                                }
+                              }}
                             >
                               {Array.from({ length: 11 }, (_, age) => (
                                 <option key={age} value={age}>
@@ -593,22 +679,64 @@ export function PackageReservationForm({
                           </div>
                           <div>
                             <div className="text-xs text-[var(--igh-muted)]">Tamanho da camisa</div>
-                            <input
-                              type="number"
-                              min={1}
-                              max={120}
-                              required
-                              placeholder="Ex.: 6, 8, 10, 12"
-                              className="mt-1 w-full rounded-lg border border-[var(--igh-border)] bg-[var(--background)] px-3 py-2 text-sm"
-                              value={childrenShirtNumbers[cidx] ?? 0}
-                              onChange={(e) =>
-                                setChildrenShirtNumbers((prev) => {
-                                  const next = prev.slice();
-                                  next[cidx] = Number(e.target.value);
-                                  return next;
-                                })
-                              }
-                            />
+                            {free && !optionalIncluded ? (
+                              <div className="mt-1 rounded-lg border border-[var(--igh-border)] bg-[var(--igh-surface)] px-3 py-2 text-sm text-[var(--igh-muted)]">
+                                {NO_SHIRT_LABEL}
+                              </div>
+                            ) : (
+                              <input
+                                type="number"
+                                min={1}
+                                max={120}
+                                required
+                                placeholder="Ex.: 6, 8, 10, 12"
+                                className="mt-1 w-full rounded-lg border border-[var(--igh-border)] bg-[var(--background)] px-3 py-2 text-sm"
+                                value={childrenShirtNumbers[cidx] ?? 0}
+                                onChange={(e) =>
+                                  setChildrenShirtNumbers((prev) => {
+                                    const next = prev.slice();
+                                    next[cidx] = Number(e.target.value);
+                                    return next;
+                                  })
+                                }
+                              />
+                            )}
+                            {free && isAdminForCustomer ? (
+                              <label className="mt-2 flex items-center gap-2 text-xs text-[var(--igh-secondary)]">
+                                <input
+                                  type="checkbox"
+                                  checked={optionalIncluded}
+                                  onChange={(e) =>
+                                    setChildrenOptionalShirtIncluded((prev) => {
+                                      const next = prev.slice();
+                                      next[cidx] = e.target.checked;
+                                      return next;
+                                    })
+                                  }
+                                />
+                                Incluir camisa (valor extra)
+                              </label>
+                            ) : null}
+                            {free && optionalIncluded ? (
+                              <div className="mt-2">
+                                <div className="text-xs text-[var(--igh-muted)]">Valor da camisa (R$)</div>
+                                <input
+                                  type="number"
+                                  min={0.01}
+                                  step={0.01}
+                                  required
+                                  className="mt-1 w-full rounded-lg border border-[var(--igh-border)] bg-[var(--background)] px-3 py-2 text-sm"
+                                  value={childrenOptionalShirtPrices[cidx] ?? ""}
+                                  onChange={(e) =>
+                                    setChildrenOptionalShirtPrices((prev) => {
+                                      const next = prev.slice();
+                                      next[cidx] = Number.parseFloat(e.target.value) || 0;
+                                      return next;
+                                    })
+                                  }
+                                />
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                         <div className="mt-2 text-xs text-[var(--igh-muted)]">

@@ -215,6 +215,10 @@ export async function buildSalesReportPdf(data: SalesReportData): Promise<Uint8A
       { indicador: "Vouchers - criancas pagas (>= 6 anos)", valor: String(data.totals.vouchers?.paidChildren ?? 0) },
       { indicador: "Vouchers - criancas nao pagas (< 6 / cortesia)", valor: String(data.totals.vouchers?.unpaidChildren ?? 0) },
       { indicador: "Kits cafe da manha", valor: String(data.totals.vouchers?.kits ?? 0) },
+      {
+        indicador: "Camisas opcionais (criancas gratuitas)",
+        valor: `${data.totals.vouchers?.optionalShirts ?? 0} / ${formatBrl(data.totals.vouchers?.optionalShirtsAmount ?? "0")}`,
+      },
       { indicador: "Vendas (subtotal)", valor: formatBrl(data.totals.totalPrice) },
       { indicador: "Descontos concedidos", valor: formatBrl(data.totals.totalDiscount) },
       { indicador: "Vendas (valor final / devido)", valor: formatBrl(data.totals.totalDue) },
@@ -428,6 +432,10 @@ export async function buildSalesReportXlsx(data: SalesReportData): Promise<Buffe
       ["Vouchers — crianças pagas (≥ 6 anos)", data.totals.vouchers?.paidChildren ?? 0],
       ["Vouchers — crianças não pagas (< 6 / cortesia)", data.totals.vouchers?.unpaidChildren ?? 0],
       ["Kits café da manhã", data.totals.vouchers?.kits ?? 0],
+      [
+        "Camisas opcionais (crianças gratuitas)",
+        `${data.totals.vouchers?.optionalShirts ?? 0} / ${Number(data.totals.vouchers?.optionalShirtsAmount ?? 0)}`,
+      ],
       ["Vendas (subtotal)", Number(data.totals.totalPrice)],
       ["Descontos concedidos", Number(data.totals.totalDiscount)],
       ["Vendas (valor final / devido)", Number(data.totals.totalDue)],

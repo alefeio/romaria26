@@ -129,6 +129,12 @@ export async function POST(request: Request) {
       childrenAges: d.childrenAges.map((n) => (typeof n === "number" ? n : Number(n))),
       childrenShirtNumbers: d.childrenShirtNumbers.map((n) => (typeof n === "number" ? n : Number(n))),
       childrenCourtesySelections: d.childrenCourtesySelections.map((v) => Boolean(v)),
+      childrenOptionalShirtIncluded: Array.from({ length: d.childrenCount }, (_, i) =>
+        Boolean(d.childrenOptionalShirtIncluded[i])
+      ),
+      childrenOptionalShirtPrices: Array.from({ length: d.childrenCount }, (_, i) =>
+        typeof d.childrenOptionalShirtPrices[i] === "number" ? d.childrenOptionalShirtPrices[i] : Number(d.childrenOptionalShirtPrices[i] ?? 0)
+      ),
       breakfastSelections: d.breakfastSelections.map((v) => Boolean(v)),
       breakfastKitSelections: d.breakfastKitSelections.map((v) => Boolean(v)),
       paymentPreferenceMethod: d.paymentPreferenceMethod ?? null,

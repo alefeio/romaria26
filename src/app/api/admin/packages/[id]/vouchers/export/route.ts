@@ -49,6 +49,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const vouchers = await prisma.reservationVoucher.findMany({
     where: {
       packageId: id,
+      voidedAt: null,
       ...(onlyNotExported ? { exportedAt: null } : {}),
       reservation: { status: { not: "CANCELLED" } },
     },

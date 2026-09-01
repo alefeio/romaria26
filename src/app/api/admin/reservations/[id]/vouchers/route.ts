@@ -49,7 +49,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       totalDue: true,
       totalPaid: true,
       paymentStatus: true,
-      vouchers: { orderBy: [{ personType: "asc" }, { personIndex: "asc" }] },
+      vouchers: { where: { voidedAt: null }, orderBy: [{ personType: "asc" }, { personIndex: "asc" }] },
     },
   });
   if (!reservation) return jsonErr("NOT_FOUND", "Reserva não encontrada.", 404);
@@ -97,6 +97,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
         shirtSize: d.shirtSize,
         age: d.personType === "CHILD" ? d.age ?? null : null,
         hasBreakfastKit: d.personType === "ADULT" ? d.hasBreakfastKit : false,
+        hasOptionalPaidShirt: d.personType === "CHILD" ? d.hasOptionalPaidShirt : false,
+        optionalShirtPrice: d.personType === "CHILD" ? d.optionalShirtPrice : null,
       });
       if ("err" in created) return created;
 

@@ -5,6 +5,7 @@ import { recalcReservationPaymentStatus } from "@/lib/payments/reservation-payme
 import { computeReservationTotalDue } from "@/lib/payments/reservation-discount";
 import { computeReservationPricingFromVouchers } from "@/lib/vouchers/sync-reservation-pricing";
 import { releaseReservationVouchersIfPaid } from "@/lib/vouchers/voucher-release";
+import { ACTIVE_VOUCHER_FILTER } from "@/lib/vouchers/reservation-vouchers";
 
 /**
  * Recalcula contagens, arrays espelho e totais financeiros da reserva a partir dos vouchers.
@@ -30,7 +31,7 @@ export async function syncReservationFromVouchers(tx: ReservationDbClient, reser
   if (!reservation) return null;
 
   const vouchers = await tx.reservationVoucher.findMany({
-    where: { reservationId },
+    where: { reservationId, ...ACTIVE_VOUCHER_FILTER },
     orderBy: [{ personType: "asc" }, { personIndex: "asc" }],
     select: {
       personType: true,
@@ -39,6 +40,8 @@ export async function syncReservationFromVouchers(tx: ReservationDbClient, reser
       age: true,
       shirtSize: true,
       hasBreakfastKit: true,
+      hasOptionalPaidShirt: true,
+      optionalShirtPrice: true,
     },
   });
 
@@ -58,6 +61,8 @@ export async function syncReservationFromVouchers(tx: ReservationDbClient, reser
       childrenAges: pricing.childrenAges,
       childrenShirtNumbers: pricing.childrenShirtNumbers,
       childrenCourtesySelections: pricing.childrenCourtesySelections,
+      childrenOptionalShirtIncluded: pricing.childrenOptionalShirtIncluded,
+      childrenOptionalShirtPrices: pricing.childrenOptionalShirtPrices,
       breakfastKitSelections: pricing.breakfastKitSelections,
       includesBreakfastKit: pricing.includesBreakfastKit,
       breakfastSelections: pricing.breakfastSelections,

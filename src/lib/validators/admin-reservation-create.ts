@@ -15,6 +15,8 @@ export const adminCreateReservationForCustomerSchema = z
     childrenAges: z.array(z.coerce.number()),
     childrenShirtNumbers: z.array(z.coerce.number()),
     childrenCourtesySelections: z.array(z.boolean()).optional().default([]),
+    childrenOptionalShirtIncluded: z.array(z.boolean()).optional().default([]),
+    childrenOptionalShirtPrices: z.array(z.coerce.number()).optional().default([]),
     breakfastSelections: z.array(z.boolean()),
     breakfastKitSelections: z.array(z.boolean()),
     paymentPreferenceMethod: z.string().min(1, "Informe o tipo de pagamento.").max(30),

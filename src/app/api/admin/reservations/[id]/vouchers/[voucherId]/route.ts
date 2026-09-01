@@ -59,6 +59,8 @@ export async function PATCH(
         shirtSize: d.shirtSize,
         age: d.age,
         hasBreakfastKit: d.hasBreakfastKit,
+        hasOptionalPaidShirt: d.hasOptionalPaidShirt,
+        optionalShirtPrice: d.optionalShirtPrice,
         personIndex: d.personIndex,
         personType: d.personType,
       });

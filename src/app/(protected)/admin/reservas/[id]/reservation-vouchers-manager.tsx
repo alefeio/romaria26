@@ -11,6 +11,12 @@ import { Modal } from "@/components/ui/Modal";
 import { Table, Td, Th } from "@/components/ui/Table";
 import type { ApiResponse } from "@/lib/api-types";
 
+const NO_SHIRT_LABEL = "Sem camisa";
+
+function isFreeChildAge(age: number): boolean {
+  return age < 6;
+}
+
 export type VoucherItem = {
   id: string;
   personType: "ADULT" | "CHILD";
@@ -21,6 +27,8 @@ export type VoucherItem = {
   age: number | null;
   shirtSize: string;
   hasBreakfastKit: boolean;
+  hasOptionalPaidShirt: boolean;
+  optionalShirtPrice: string | null;
   usedAt: string | null;
   releasedAt: string | null;
   createdAt: string;
@@ -53,6 +61,8 @@ type FormState = {
   shirtSize: string;
   age: string;
   hasBreakfastKit: boolean;
+  hasOptionalPaidShirt: boolean;
+  optionalShirtPrice: string;
 };
 
 const emptyForm = (): FormState => ({
@@ -62,6 +72,8 @@ const emptyForm = (): FormState => ({
   shirtSize: "M",
   age: "8",
   hasBreakfastKit: false,
+  hasOptionalPaidShirt: false,
+  optionalShirtPrice: "",
 });
 
 export function ReservationVouchersManager({
@@ -160,6 +172,8 @@ export function ReservationVouchersManager({
       shirtSize: v.shirtSize,
       age: v.age != null ? String(v.age) : "8",
       hasBreakfastKit: v.hasBreakfastKit,
+      hasOptionalPaidShirt: v.hasOptionalPaidShirt,
+      optionalShirtPrice: v.optionalShirtPrice ?? "",
     });
     setModalOpen(true);
   }
@@ -178,6 +192,25 @@ export function ReservationVouchersManager({
         toast.push("error", "Idade da criança: 0 a 10 anos.");
         return;
       }
+      const freeChild = isFreeChildAge(age);
+      if (freeChild && form.hasOptionalPaidShirt) {
+        const price = Number.parseFloat(form.optionalShirtPrice.replace(",", "."));
+        if (!Number.isFinite(price) || price <= 0) {
+          toast.push("error", "Informe o valor da camisa opcional.");
+          return;
+        }
+        const shirtNum = Number.parseInt(form.shirtSize, 10);
+        if (!Number.isInteger(shirtNum) || shirtNum <= 0) {
+          toast.push("error", "Informe o tamanho da camisa para a criança gratuita.");
+          return;
+        }
+      } else if (!freeChild) {
+        const shirtNum = Number.parseInt(form.shirtSize, 10);
+        if (!Number.isInteger(shirtNum) || shirtNum <= 0) {
+          toast.push("error", "Informe o tamanho da camisa da criança.");
+          return;
+        }
+      }
     }
 
     setSaving(true);
@@ -194,7 +227,17 @@ export function ReservationVouchersManager({
         ...(personIndex !== undefined ? { personIndex } : {}),
         name,
         shirtSize: form.shirtSize,
-        ...(form.personType === "CHILD" ? { age: Number.parseInt(form.age, 10) } : {}),
+        ...(form.personType === "CHILD"
+          ? {
+              age: Number.parseInt(form.age, 10),
+              hasOptionalPaidShirt: form.hasOptionalPaidShirt,
+              optionalShirtPrice: form.hasOptionalPaidShirt ? form.optionalShirtPrice : null,
+              shirtSize:
+                isFreeChildAge(Number.parseInt(form.age, 10)) && !form.hasOptionalPaidShirt
+                  ? NO_SHIRT_LABEL
+                  : form.shirtSize,
+            }
+          : {}),
         ...(form.personType === "ADULT" ? { hasBreakfastKit: form.hasBreakfastKit } : {}),
       };
 
@@ -282,7 +325,7 @@ export function ReservationVouchersManager({
         <p className="mb-3 text-xs text-[var(--text-muted)]">
           Reserva: {counts.adultsCount} adulto(s), {counts.childrenCount} criança(s) · Pagamento:{" "}
           <span className="font-medium">{paymentStatus}</span>. Ao criar ou remover vouchers, o valor devido é
-          recalculado (adulto/criança ≥ 6 anos + kit café). Se a reserva estava quitada, um novo ingresso pago muda o
+          recalculado (adulto/criança ≥ 6 anos + kit café + camisas opcionais de crianças gratuitas). Se a reserva estava quitada, um novo ingresso pago muda o
           status para PARTIAL até quitar a diferença.
         </p>
         <Table>
@@ -306,6 +349,15 @@ export function ReservationVouchersManager({
                 <Td className="font-mono text-sm">{v.code}</Td>
                 <Td>
                   {v.shirtSize}
+                  {v.hasOptionalPaidShirt && v.optionalShirtPrice ? (
+                    <span className="block text-xs text-emerald-700 dark:text-emerald-300">
+                      Camisa opcional:{" "}
+                      {Number.parseFloat(v.optionalShirtPrice).toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    </span>
+                  ) : null}
                   {v.personType === "CHILD" && v.age != null ? (
                     <span className="text-xs text-[var(--text-muted)]"> · {v.age} anos</span>
                   ) : null}
@@ -406,6 +458,10 @@ export function ReservationVouchersManager({
                   </option>
                 ))}
               </select>
+            ) : isFreeChildAge(Number.parseInt(form.age, 10)) && !form.hasOptionalPaidShirt ? (
+              <div className="mt-1 rounded-md border border-[var(--card-border)] bg-[var(--igh-surface)] px-3 py-2 text-sm text-[var(--text-muted)]">
+                {NO_SHIRT_LABEL}
+              </div>
             ) : (
               <Input
                 type="number"
@@ -423,7 +479,16 @@ export function ReservationVouchersManager({
               <select
                 className="mt-1 w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm"
                 value={form.age}
-                onChange={(e) => setForm((f) => ({ ...f, age: e.target.value }))}
+                onChange={(e) => {
+                  const nextAge = e.target.value;
+                  setForm((f) => ({
+                    ...f,
+                    age: nextAge,
+                    hasOptionalPaidShirt:
+                      Number.parseInt(nextAge, 10) >= 6 ? false : f.hasOptionalPaidShirt,
+                    shirtSize: Number.parseInt(nextAge, 10) < 6 && !f.hasOptionalPaidShirt ? NO_SHIRT_LABEL : f.shirtSize,
+                  }));
+                }}
                 required
               >
                 {Array.from({ length: 11 }, (_, age) => (
@@ -432,8 +497,40 @@ export function ReservationVouchersManager({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">Abaixo de 6 anos: voucher sem cobrança.</p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">Abaixo de 6 anos: voucher sem cobrança de ingresso.</p>
             </div>
+          ) : null}
+          {form.personType === "CHILD" && isFreeChildAge(Number.parseInt(form.age, 10)) ? (
+            <>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.hasOptionalPaidShirt}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      hasOptionalPaidShirt: e.target.checked,
+                      shirtSize: e.target.checked ? (f.shirtSize === NO_SHIRT_LABEL ? "8" : f.shirtSize) : NO_SHIRT_LABEL,
+                      optionalShirtPrice: e.target.checked ? f.optionalShirtPrice : "",
+                    }))
+                  }
+                />
+                Incluir camisa (valor extra)
+              </label>
+              {form.hasOptionalPaidShirt ? (
+                <div>
+                  <label className="text-sm font-medium">Valor da camisa (R$)</label>
+                  <Input
+                    type="number"
+                    min={0.01}
+                    step={0.01}
+                    value={form.optionalShirtPrice}
+                    onChange={(e) => setForm((f) => ({ ...f, optionalShirtPrice: e.target.value }))}
+                    required
+                  />
+                </div>
+              ) : null}
+            </>
           ) : null}
           {form.personType === "ADULT" ? (
             <label className="flex items-center gap-2 text-sm">

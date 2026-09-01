@@ -24,6 +24,8 @@ type Billing = {
       paidChildren: number;
       unpaidChildren: number;
       kits: number;
+      optionalShirts: number;
+      optionalShirtsAmount: string;
     };
   };
   overdue: {
@@ -252,6 +254,15 @@ export default function AdminFaturamentoPage() {
                   <li className="flex justify-between gap-3">
                     <span>Kits café</span>
                     <span className="font-medium text-[var(--text-primary)]">{data.totals.vouchers?.kits ?? 0}</span>
+                  </li>
+                  <li className="flex justify-between gap-3">
+                    <span>Camisas opcionais (crianças)</span>
+                    <span className="font-medium text-[var(--text-primary)]">
+                      {data.totals.vouchers?.optionalShirts ?? 0}
+                      {(data.totals.vouchers?.optionalShirts ?? 0) > 0
+                        ? ` · ${brl(data.totals.vouchers?.optionalShirtsAmount ?? "0")}`
+                        : ""}
+                    </span>
                   </li>
                 </ul>
                 <div className="mt-2 text-xs text-[var(--text-muted)]">
