@@ -17,6 +17,8 @@ type Row = {
   quantity: number;
   includesBreakfastKit: boolean;
   totalPrice: string;
+  discountAmount: string;
+  totalDue: string;
   status: string;
   notes: string | null;
   reservedAt: string;
@@ -37,6 +39,10 @@ const toneForStatus = (s: string): "amber" | "green" | "red" | "zinc" => {
   if (s === "PENDING") return "amber";
   return "zinc";
 };
+
+function brl(value: number): string {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
 
 export default function AdminReservasPage() {
   const toast = useToast();
@@ -209,7 +215,21 @@ export default function AdminReservasPage() {
                   {r.includesBreakfastKit ? <span className="block text-xs text-[var(--text-muted)]">+ kit</span> : null}
                 </Td>
                 <Td>
-                  {Number.parseFloat(r.totalPrice).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  {(() => {
+                    const subtotal = Number.parseFloat(r.totalPrice) || 0;
+                    const discount = Number.parseFloat(r.discountAmount) || 0;
+                    const finalValue = Number.parseFloat(r.totalDue) || 0;
+                    return (
+                      <div className="text-sm">
+                        <div className="font-medium text-[var(--text-primary)]">{brl(finalValue)}</div>
+                        {discount > 0 ? (
+                          <div className="mt-0.5 text-xs text-[var(--text-muted)]">
+                            {brl(subtotal)} − {brl(discount)}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })()}
                 </Td>
                 <Td>
                   <Badge tone={toneForStatus(r.status)}>{statusLabel[r.status] ?? r.status}</Badge>

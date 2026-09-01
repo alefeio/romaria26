@@ -77,6 +77,8 @@ export async function GET(request: Request) {
       unitPriceSnapshot: r.unitPriceSnapshot.toString(),
       breakfastKitUnitPriceSnapshot: r.breakfastKitUnitPriceSnapshot.toString(),
       totalPrice: r.totalPrice.toString(),
+      discountAmount: r.discountAmount.toString(),
+      totalDue: r.totalDue.toString(),
       status: r.status,
       notes: r.notes,
       reservedAt: r.reservedAt.toISOString(),

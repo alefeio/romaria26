@@ -215,7 +215,9 @@ export async function buildSalesReportPdf(data: SalesReportData): Promise<Uint8A
       { indicador: "Vouchers - criancas pagas (>= 6 anos)", valor: String(data.totals.vouchers?.paidChildren ?? 0) },
       { indicador: "Vouchers - criancas nao pagas (< 6 / cortesia)", valor: String(data.totals.vouchers?.unpaidChildren ?? 0) },
       { indicador: "Kits cafe da manha", valor: String(data.totals.vouchers?.kits ?? 0) },
-      { indicador: "Vendas (devido)", valor: formatBrl(data.totals.totalDue) },
+      { indicador: "Vendas (subtotal)", valor: formatBrl(data.totals.totalPrice) },
+      { indicador: "Descontos concedidos", valor: formatBrl(data.totals.totalDiscount) },
+      { indicador: "Vendas (valor final / devido)", valor: formatBrl(data.totals.totalDue) },
       { indicador: "Recebido (saldos das reservas)", valor: formatBrl(data.totals.totalPaid) },
       { indicador: "A receber", valor: formatBrl(data.totals.totalToReceive) },
       {
@@ -426,7 +428,9 @@ export async function buildSalesReportXlsx(data: SalesReportData): Promise<Buffe
       ["Vouchers — crianças pagas (≥ 6 anos)", data.totals.vouchers?.paidChildren ?? 0],
       ["Vouchers — crianças não pagas (< 6 / cortesia)", data.totals.vouchers?.unpaidChildren ?? 0],
       ["Kits café da manhã", data.totals.vouchers?.kits ?? 0],
-      ["Vendas (devido)", Number(data.totals.totalDue)],
+      ["Vendas (subtotal)", Number(data.totals.totalPrice)],
+      ["Descontos concedidos", Number(data.totals.totalDiscount)],
+      ["Vendas (valor final / devido)", Number(data.totals.totalDue)],
       ["Recebido (saldos das reservas)", Number(data.totals.totalPaid)],
       ["A receber", Number(data.totals.totalToReceive)],
       ["Pagamentos no período (qtd)", data.totals.paymentsCount],
@@ -436,7 +440,7 @@ export async function buildSalesReportXlsx(data: SalesReportData): Promise<Buffe
     ],
   });
   // Formatar valores monetários do resumo (linhas de dados da tabela)
-  for (const r of [12, 13, 14, 16, 18]) {
+  for (const r of [12, 13, 14, 15, 16, 18, 20]) {
     resumo.getCell(`B${r}`).numFmt = '"R$"#,##0.00';
   }
   // Congelar só o título no resumo (tabela começa na linha 5)

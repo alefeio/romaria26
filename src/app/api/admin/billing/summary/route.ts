@@ -45,7 +45,7 @@ export async function GET(request: Request) {
     const [totals, vouchers] = await Promise.all([
       prisma.reservation.aggregate({
         where: baseWhere,
-        _sum: { totalDue: true, totalPaid: true },
+        _sum: { totalPrice: true, discountAmount: true, totalDue: true, totalPaid: true },
         _count: { _all: true },
       }),
       loadBillingVoucherStats(baseWhere).catch((err) => {
@@ -82,6 +82,8 @@ export async function GET(request: Request) {
 
     const overdueSum = overdueInstallments.reduce((acc, i) => acc.add(i.amount), new Prisma.Decimal(0));
 
+    const sumPrice = totals._sum?.totalPrice ?? 0;
+    const sumDiscount = totals._sum?.discountAmount ?? 0;
     const sumDue = totals._sum?.totalDue ?? 0;
     const sumPaid = totals._sum?.totalPaid ?? 0;
     const countAll = totals._count?._all ?? 0;
@@ -94,6 +96,8 @@ export async function GET(request: Request) {
       },
       totals: {
         reservationsCount: countAll,
+        totalPrice: new Prisma.Decimal(sumPrice.toString()).toString(),
+        totalDiscount: new Prisma.Decimal(sumDiscount.toString()).toString(),
         totalDue: new Prisma.Decimal(sumDue.toString()).toString(),
         totalPaid: new Prisma.Decimal(sumPaid.toString()).toString(),
         totalToReceive: unpaid.toString(),

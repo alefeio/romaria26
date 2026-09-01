@@ -13,6 +13,8 @@ type Billing = {
   range: { from: string | null; to: string | null };
   totals: {
     reservationsCount: number;
+    totalPrice: string;
+    totalDiscount: string;
     totalDue: string;
     totalPaid: string;
     totalToReceive: string;
@@ -161,7 +163,7 @@ export default function AdminFaturamentoPage() {
         <div>
           <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Faturamento</h1>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            Vendas (devido), pagamentos recebidos e parcelas em atraso. Use Exportar PDF/Excel para o relatório
+            Subtotal, descontos, valor final, recebimentos e parcelas em atraso. Use Exportar PDF/Excel para o relatório
             completo (respeita o filtro de datas).
           </p>
         </div>
@@ -258,9 +260,24 @@ export default function AdminFaturamentoPage() {
               </div>
             </div>
             <div className="card">
-              <div className="card-header">Vendas (devido)</div>
+              <div className="card-header">Vendas</div>
               <div className="card-body text-sm">
-                <div className="text-2xl font-semibold text-[var(--text-primary)]">{brl(data.totals.totalDue ?? "0")}</div>
+                <div className="text-2xl font-semibold text-[var(--text-primary)]">
+                  {brl(data.totals.totalDue ?? "0")}
+                </div>
+                <div className="mt-1 text-xs text-[var(--text-muted)]">Valor final (após descontos)</div>
+                <ul className="mt-3 space-y-1 text-xs text-[var(--text-secondary)]">
+                  <li className="flex justify-between gap-3">
+                    <span>Subtotal</span>
+                    <span className="font-medium text-[var(--text-primary)]">{brl(data.totals.totalPrice ?? "0")}</span>
+                  </li>
+                  <li className="flex justify-between gap-3">
+                    <span>Descontos</span>
+                    <span className="font-medium text-emerald-700 dark:text-emerald-300">
+                      −{brl(data.totals.totalDiscount ?? "0")}
+                    </span>
+                  </li>
+                </ul>
               </div>
             </div>
             <div className="card">

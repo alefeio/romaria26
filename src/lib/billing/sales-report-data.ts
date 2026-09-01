@@ -65,6 +65,8 @@ export type SalesReportData = {
   range: { from: string | null; to: string | null };
   totals: {
     reservationsCount: number;
+    totalPrice: string;
+    totalDiscount: string;
     totalDue: string;
     totalPaid: string;
     totalToReceive: string;
@@ -167,12 +169,14 @@ export async function loadSalesReportData(opts: {
     }),
     prisma.reservation.aggregate({
       where: baseWhere,
-      _sum: { totalDue: true, totalPaid: true },
+      _sum: { totalPrice: true, discountAmount: true, totalDue: true, totalPaid: true },
       _count: { _all: true },
     }),
     loadBillingVoucherStats(baseWhere).catch(() => EMPTY_VOUCHER_STATS),
   ]);
 
+  const sumPrice = new Prisma.Decimal(money(agg._sum.totalPrice));
+  const sumDiscount = new Prisma.Decimal(money(agg._sum.discountAmount));
   const sumDue = new Prisma.Decimal(money(agg._sum.totalDue));
   const sumPaid = new Prisma.Decimal(money(agg._sum.totalPaid));
   const paymentsAmount = payments.reduce((acc, p) => acc.add(p.amount), new Prisma.Decimal(0));
@@ -186,6 +190,8 @@ export async function loadSalesReportData(opts: {
     },
     totals: {
       reservationsCount: agg._count._all,
+      totalPrice: sumPrice.toString(),
+      totalDiscount: sumDiscount.toString(),
       totalDue: sumDue.toString(),
       totalPaid: sumPaid.toString(),
       totalToReceive: sumDue.sub(sumPaid).toString(),
