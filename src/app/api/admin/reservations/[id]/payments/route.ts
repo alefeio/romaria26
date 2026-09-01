@@ -6,6 +6,7 @@ import { adminCreateReservationPaymentSchema } from "@/lib/validators/payments";
 import { recalcReservationPaymentStatus } from "@/lib/payments/reservation-payments";
 import { createAuditLog } from "@/lib/audit";
 import { sendReservationVouchersIfPaid } from "@/lib/vouchers/reservation-vouchers";
+import { sendReservationPartialPaymentCustomerEmail } from "@/lib/payments/reservation-partial-payment-email";
 
 function isUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
@@ -187,6 +188,12 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   // Se este pagamento quitou 100%, gera vouchers e envia ao cliente (idempotente).
   if (result.updated?.paymentStatus === "PAID") {
     await sendReservationVouchersIfPaid(id, auth.id).catch(() => null);
+  } else if (result.updated?.paymentStatus === "PARTIAL") {
+    await sendReservationPartialPaymentCustomerEmail(
+      id,
+      { amount, method: d.method, paidAt },
+      auth.id
+    ).catch((e) => console.error("[POST payment] partial payment email", e));
   }
 
   return jsonOk(

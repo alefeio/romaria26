@@ -6,6 +6,7 @@ import { adminCreateInstallmentSchema } from "@/lib/validators/payments";
 import { recalcReservationPaymentStatus } from "@/lib/payments/reservation-payments";
 import { createAuditLog } from "@/lib/audit";
 import { sendReservationVouchersIfPaid } from "@/lib/vouchers/reservation-vouchers";
+import { sendReservationPartialPaymentCustomerEmail } from "@/lib/payments/reservation-partial-payment-email";
 
 function isUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
@@ -64,7 +65,13 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
         },
       });
       const payUpdated = await recalcReservationPaymentStatus(tx, id);
-      return { inst, paymentStatus: payUpdated?.paymentStatus ?? null };
+      return {
+        inst,
+        paymentStatus: payUpdated?.paymentStatus ?? null,
+        paymentAmount: inst.amount,
+        paymentMethod: inst.method ?? "OTHER",
+        paymentPaidAt: inst.paidAt ?? new Date(),
+      };
     }
 
     await createAuditLog({
@@ -82,6 +89,16 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
 
   if (created.paymentStatus === "PAID") {
     await sendReservationVouchersIfPaid(id, auth.id).catch(() => null);
+  } else if (created.paymentStatus === "PARTIAL" && created.paymentAmount != null) {
+    await sendReservationPartialPaymentCustomerEmail(
+      id,
+      {
+        amount: created.paymentAmount,
+        method: created.paymentMethod ?? "OTHER",
+        paidAt: created.paymentPaidAt ?? new Date(),
+      },
+      auth.id
+    ).catch((e) => console.error("[POST installment] partial payment email", e));
   }
 
   return jsonOk({ installment: { id: created.inst.id } }, { status: 201 });

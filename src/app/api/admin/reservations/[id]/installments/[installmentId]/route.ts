@@ -5,6 +5,7 @@ import { adminPatchInstallmentSchema } from "@/lib/validators/payments";
 import { recalcReservationPaymentStatus } from "@/lib/payments/reservation-payments";
 import { createAuditLog } from "@/lib/audit";
 import { sendReservationVouchersIfPaid } from "@/lib/vouchers/reservation-vouchers";
+import { sendReservationPartialPaymentCustomerEmail } from "@/lib/payments/reservation-partial-payment-email";
 
 function isUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
@@ -72,7 +73,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
         performedByUserId: auth.id,
       });
 
-      return { ok: row, paymentStatus: payUpdated?.paymentStatus ?? null };
+      return { ok: row, paymentStatus: payUpdated?.paymentStatus ?? null, paymentAmount: inst.amount, paymentMethod: method, paymentPaidAt: paidAt };
     }
 
     if (d.status === "PAID" && inst.status === "PAID") {
@@ -142,6 +143,24 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
 
   if (updated.paymentStatus === "PAID") {
     await sendReservationVouchersIfPaid(id, auth.id).catch(() => null);
+  } else if (
+    updated.paymentStatus === "PARTIAL" &&
+    "paymentAmount" in updated &&
+    updated.paymentAmount != null &&
+    "paymentMethod" in updated &&
+    updated.paymentMethod &&
+    "paymentPaidAt" in updated &&
+    updated.paymentPaidAt
+  ) {
+    await sendReservationPartialPaymentCustomerEmail(
+      id,
+      {
+        amount: updated.paymentAmount,
+        method: updated.paymentMethod,
+        paidAt: updated.paymentPaidAt,
+      },
+      auth.id
+    ).catch((e) => console.error("[PATCH installment] partial payment email", e));
   }
 
   return jsonOk({
