@@ -70,7 +70,7 @@ export default function AdminPacotesPage() {
         <div>
           <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Pacotes (passeios)</h1>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            No site público, aparecem: Em breve, Aberto e Esgotado (desde que ativo).
+            No site público, aparecem: Em breve, Aberto, Esgotado e Encerrado (desde que ativo).
           </p>
         </div>
         <Link href="/admin/pacotes/new">

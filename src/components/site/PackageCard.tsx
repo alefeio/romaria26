@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Card } from "./Card";
 import { Button } from "./Button";
 
@@ -43,6 +42,14 @@ export function PackageCard(p: PackageCardProps) {
             : `${p.remainingPlaces} vagas`;
 
   const canOpenDetails = p.status === "OPEN" || p.status === "SOLD_OUT";
+  const buttonLabel =
+    p.status === "SOON"
+      ? "Em breve"
+      : p.status === "CLOSED"
+        ? "Encerrado"
+        : canOpenDetails
+          ? "Ver detalhes"
+          : "Indisponível";
   const statusBadge =
     p.status === "SOON"
       ? "Em_breve"
@@ -96,11 +103,11 @@ export function PackageCard(p: PackageCardProps) {
         <div className="mt-auto pt-4">
           {canOpenDetails ? (
             <Button as="link" href={`/passeios/${p.slug}`} variant="primary" size="md" className="w-full justify-center">
-              Ver detalhes
+              {buttonLabel}
             </Button>
           ) : (
             <Button type="button" variant="secondary" size="md" className="w-full justify-center" disabled>
-              Indisponível
+              {buttonLabel}
             </Button>
           )}
         </div>

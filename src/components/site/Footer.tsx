@@ -68,20 +68,21 @@ export function Footer({ menuItems, settings }: FooterProps) {
     addressLines.length > 0 ||
     !!settings?.businessHours;
 
-  const contactLines: string[] = [];
-  if (settings?.contactEmail) contactLines.push(settings.contactEmail);
-  if (settings?.contactPhone) contactLines.push(settings.contactPhone);
-  if (settings?.contactWhatsapp) contactLines.push(`WhatsApp: ${settings.contactWhatsapp}`);
-
   const whatsappNumber = settings?.contactWhatsapp?.replace(/\D/g, "") || "";
-  const whatsappHref = whatsappNumber.length >= 10 ? `https://wa.me/${whatsappNumber.startsWith("55") ? whatsappNumber : "55" + whatsappNumber}` : "#";
+  const whatsappHref =
+    whatsappNumber.length >= 10
+      ? `https://wa.me/${whatsappNumber.startsWith("55") ? whatsappNumber : "55" + whatsappNumber}`
+      : null;
+
+  const contactLinkClass =
+    "text-white/80 underline-offset-2 hover:text-white hover:underline focus:outline-none focus:ring-2 focus:ring-white/50 rounded";
 
   const socials = [
     { name: "Instagram", href: settings?.socialInstagram ?? "#", icon: "instagram" as const },
     { name: "Facebook", href: settings?.socialFacebook ?? "#", icon: "facebook" as const },
     { name: "LinkedIn", href: settings?.socialLinkedin ?? "#", icon: "linkedin" as const },
     { name: "Youtube", href: settings?.socialYoutube ?? "#", icon: "youtube" as const },
-    { name: "WhatsApp", href: whatsappHref, icon: "whatsapp" as const },
+    { name: "WhatsApp", href: whatsappHref ?? "#", icon: "whatsapp" as const },
   ].filter((s) => s.href && s.href !== "#");
 
   const socialIconMap = {
@@ -171,9 +172,30 @@ export function Footer({ menuItems, settings }: FooterProps) {
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wider text-white/90">Contato</h3>
               <div className="mt-4 space-y-1 text-sm text-white/80">
-                {contactLines.map((line) => (
-                  <p key={line}>{line}</p>
-                ))}
+                {settings?.contactEmail ? (
+                  <p>
+                    <a href={`mailto:${settings.contactEmail.trim()}`} className={contactLinkClass}>
+                      {settings.contactEmail}
+                    </a>
+                  </p>
+                ) : null}
+                {settings?.contactPhone ? <p>{settings.contactPhone}</p> : null}
+                {settings?.contactWhatsapp ? (
+                  <p>
+                    {whatsappHref ? (
+                      <a
+                        href={whatsappHref}
+                        className={contactLinkClass}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        WhatsApp: {settings.contactWhatsapp}
+                      </a>
+                    ) : (
+                      <>WhatsApp: {settings.contactWhatsapp}</>
+                    )}
+                  </p>
+                ) : null}
                 {addressLines.map((line, i) => (
                   <p key={i}>{line}</p>
                 ))}

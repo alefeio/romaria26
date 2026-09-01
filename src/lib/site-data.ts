@@ -553,8 +553,8 @@ async function toPackagePublicListItem(p: {
 export async function getPackagesForPublicSite(): Promise<PackagePublicListItem[]> {
   try {
     const rows = await prisma.package.findMany({
-      // No site público: mostrar apenas (Em breve / Aberto / Esgotado). Encerrado não aparece.
-      where: { isActive: true, status: { in: ["OPEN", "SOLD_OUT", "SOON"] } },
+      // No site público: Em breve, Aberto, Esgotado e Encerrado (desde que ativo).
+      where: { isActive: true, status: { in: ["OPEN", "SOLD_OUT", "SOON", "CLOSED"] } },
       orderBy: [{ departureDate: "asc" }, { name: "asc" }],
     });
     return Promise.all(rows.map((p) => toPackagePublicListItem(p)));
