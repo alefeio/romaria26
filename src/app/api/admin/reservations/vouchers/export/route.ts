@@ -31,10 +31,18 @@ export async function GET(request: Request) {
       hasBreakfastKit: true,
       personType: true,
       packageId: true,
-      package: { select: { id: true, name: true, slug: true, departureDate: true } },
     },
-    orderBy: [{ package: { departureDate: "asc" } }, { name: "asc" }],
+    orderBy: [{ name: "asc" }],
   });
+
+  const packageIds = Array.from(new Set(vouchers.map((v) => v.packageId)));
+  const packages = packageIds.length
+    ? await prisma.package.findMany({
+        where: { id: { in: packageIds } },
+        select: { id: true, name: true, departureDate: true },
+      })
+    : [];
+  const packageById = new Map(packages.map((p) => [p.id, p]));
 
   const byPackage = new Map<
     string,
@@ -53,15 +61,17 @@ export async function GET(request: Request) {
   >();
 
   for (const v of vouchers) {
-    const key = v.packageId;
-    let group = byPackage.get(key);
+    const pkg = packageById.get(v.packageId);
+    if (!pkg) continue;
+
+    let group = byPackage.get(v.packageId);
     if (!group) {
       group = {
-        packageName: v.package.name,
-        departureDate: v.package.departureDate,
+        packageName: pkg.name,
+        departureDate: pkg.departureDate,
         vouchers: [],
       };
-      byPackage.set(key, group);
+      byPackage.set(v.packageId, group);
     }
     group.vouchers.push({
       id: v.id,
