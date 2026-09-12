@@ -9,6 +9,7 @@ import {
 import { reservationRouteErrorResponse } from "@/lib/reservations/route-errors";
 import { sendEmailAndRecord } from "@/lib/email/send-and-record";
 import { getEmailBranding, wrapBrandedEmail } from "@/lib/email/branding";
+import { sendReservationVouchersIfPaid } from "@/lib/vouchers/reservation-vouchers";
 
 function escapeHtml(s: string): string {
   return String(s ?? "")
@@ -232,6 +233,7 @@ export async function POST(request: Request) {
     const whatsappUrl = buildWhatsAppHref(settings?.contactWhatsapp, summaryText);
 
     const subject = `Reserva recebida — ${pkg?.name ?? "Passeio"} (${reservation.quantity} pessoa(s))`;
+    const adminSubject = `[ADMIN] Reserva pelo site — ${pkg?.name ?? "Passeio"} (${reservation.quantity} pessoa(s))`;
     const branding = await getEmailBranding();
     const loginUrl = branding.loginUrl;
     const resetUrl = branding.resetPasswordUrl;
@@ -248,6 +250,13 @@ export async function POST(request: Request) {
       </div>
     `;
 
+    const detailsBlock = `
+        <div style="margin-top: 16px;">
+          <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color:#6b7280; margin-bottom: 8px;">Detalhes da reserva</div>
+          <pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; white-space: pre-wrap; line-height: 1.45; background:#fff; border:1px solid #e5e7eb; border-radius: 12px; padding: 12px; margin:0;">${pre}</pre>
+        </div>
+    `;
+
     const html = wrapBrandedEmail({
       logoUrl: branding.logoUrl,
       siteName: branding.siteName,
@@ -255,10 +264,26 @@ export async function POST(request: Request) {
         <h2 style="margin:0 0 6px; font-size: 18px;">Reserva recebida</h2>
         <p style="margin:0 0 14px; color:#374151; font-size: 14px;">Recebemos sua reserva. Confira os detalhes abaixo.</p>
         ${accessBlock}
-        <div style="margin-top: 16px;">
-          <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color:#6b7280; margin-bottom: 8px;">Detalhes da reserva</div>
-          <pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; white-space: pre-wrap; line-height: 1.45; background:#fff; border:1px solid #e5e7eb; border-radius: 12px; padding: 12px; margin:0;">${pre}</pre>
-        </div>
+        ${detailsBlock}
+      `,
+    });
+
+    const adminOriginBanner = `
+      <div style="margin:0 0 14px; padding:12px 14px; border:1px solid #bfdbfe; border-radius:12px; background:#eff6ff;">
+        <div style="font-size:13px; font-weight:700; color:#1e40af;">Origem da reserva: site</div>
+        <div style="margin-top:4px; font-size:12px; color:#1e3a8a;">Feita pelo cliente na página do passeio (romariafluvial.com.br/passeios).</div>
+      </div>
+    `;
+
+    const adminHtml = wrapBrandedEmail({
+      logoUrl: branding.logoUrl,
+      siteName: branding.siteName,
+      bodyHtml: `
+        ${adminOriginBanner}
+        <h2 style="margin:0 0 6px; font-size: 18px;">Reserva recebida</h2>
+        <p style="margin:0 0 14px; color:#374151; font-size: 14px;">Nova reserva criada pelo site. Confira os detalhes abaixo.</p>
+        ${accessBlock}
+        ${detailsBlock}
       `,
     });
 
@@ -277,8 +302,8 @@ export async function POST(request: Request) {
       adminTo.length
         ? sendEmailAndRecord({
             to: adminTo,
-            subject: `[ADMIN] ${subject}`,
-            html,
+            subject: adminSubject,
+            html: adminHtml,
             emailType: "RESERVATION_CREATED_ADMIN",
             entityType: "Reservation",
             entityId: reservation.id,
@@ -286,6 +311,10 @@ export async function POST(request: Request) {
           })
         : Promise.resolve(),
     ]);
+
+    if (reservation.paymentStatus === "PAID") {
+      await sendReservationVouchersIfPaid(reservation.id, session.id).catch(() => null);
+    }
 
     return jsonOk({ reservation, whatsappUrl: whatsappUrl ?? undefined }, { status: 201 });
   } catch (e) {

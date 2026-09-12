@@ -16,6 +16,7 @@ import {
 } from "@/lib/reservations/create-reservation";
 import { reservationRouteErrorResponse } from "@/lib/reservations/route-errors";
 import { adminCreateReservationForCustomerSchema } from "@/lib/validators/admin-reservation-create";
+import { sendReservationVouchersIfPaid } from "@/lib/vouchers/reservation-vouchers";
 
 function buildWhatsAppHref(contactWhatsapp: string | null | undefined, text: string): string | null {
   const digits = (contactWhatsapp ?? "").replace(/\D/g, "");
@@ -175,7 +176,7 @@ export async function POST(request: Request) {
     const siteName = settings?.siteName ?? "Romaria Fluvial";
 
     const summaryText = [
-      `Reserva (painel) — ${siteName}`,
+      `Reserva — ${siteName}`,
       pkgLine,
       `Embarque: ${pkg?.boardingLocation ?? "-"}`,
       `Adultos: ${reservation.adultsCount} | Crianças: ${reservation.childrenCount} | Total: ${reservation.quantity}`,
@@ -196,9 +197,11 @@ export async function POST(request: Request) {
       .filter(Boolean)
       .join("\n");
 
-    const whatsappUrl = buildWhatsAppHref(settings?.contactWhatsapp, summaryText);
+    const whatsappSummaryText = [`Reserva (painel) — ${siteName}`, ...summaryText.split("\n").slice(1)].join("\n");
+    const whatsappUrl = buildWhatsAppHref(settings?.contactWhatsapp, whatsappSummaryText);
 
-    const subject = `Reserva (painel) — ${pkg?.name ?? "Passeio"} (${reservation.quantity} pessoa(s))`;
+    const subject = `Reserva recebida — ${pkg?.name ?? "Passeio"} (${reservation.quantity} pessoa(s))`;
+    const adminSubject = `[ADMIN] Reserva pelo painel — ${pkg?.name ?? "Passeio"} (${reservation.quantity} pessoa(s))`;
     const branding = await getEmailBranding();
     const loginUrl = branding.loginUrl;
     const resetUrl = branding.resetPasswordUrl;
@@ -222,6 +225,13 @@ export async function POST(request: Request) {
 
     const pre = summaryText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+    const detailsBlock = `
+        <div style="margin-top: 16px;">
+          <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color:#6b7280; margin-bottom: 8px;">Detalhes da reserva</div>
+          <pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; white-space: pre-wrap; line-height: 1.45; background:#fff; border:1px solid #e5e7eb; border-radius: 12px; padding: 12px; margin:0;">${pre}</pre>
+        </div>
+    `;
+
     const customerHtml = wrapBrandedEmail({
       logoUrl: branding.logoUrl,
       siteName: branding.siteName,
@@ -229,10 +239,7 @@ export async function POST(request: Request) {
         <h2 style="margin:0 0 6px; font-size: 18px;">Reserva recebida</h2>
         <p style="margin:0 0 14px; color:#374151; font-size: 14px;">Recebemos sua reserva. Confira os detalhes abaixo.</p>
         ${accessBlock}
-        <div style="margin-top: 16px;">
-          <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color:#6b7280; margin-bottom: 8px;">Detalhes da reserva</div>
-          <pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; white-space: pre-wrap; line-height: 1.45; background:#fff; border:1px solid #e5e7eb; border-radius: 12px; padding: 12px; margin:0;">${pre}</pre>
-        </div>
+        ${detailsBlock}
       `,
     });
 
@@ -242,17 +249,21 @@ export async function POST(request: Request) {
       accessEmail,
       temporaryPassword: null,
     });
+    const adminOriginBanner = `
+      <div style="margin:0 0 14px; padding:12px 14px; border:1px solid #fde68a; border-radius:12px; background:#fffbeb;">
+        <div style="font-size:13px; font-weight:700; color:#92400e;">Origem da reserva: painel administrativo</div>
+        <div style="margin-top:4px; font-size:12px; color:#78350f;">Criada em /admin/reservas/nova (não pelo site).</div>
+      </div>
+    `;
     const adminHtml = wrapBrandedEmail({
       logoUrl: branding.logoUrl,
       siteName: branding.siteName,
       bodyHtml: `
+        ${adminOriginBanner}
         <h2 style="margin:0 0 6px; font-size: 18px;">Reserva recebida</h2>
-        <p style="margin:0 0 14px; color:#374151; font-size: 14px;">Recebemos sua reserva. Confira os detalhes abaixo.</p>
+        <p style="margin:0 0 14px; color:#374151; font-size: 14px;">Nova reserva criada pelo painel. Confira os detalhes abaixo.</p>
         ${adminAccessBlock}
-        <div style="margin-top: 16px;">
-          <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color:#6b7280; margin-bottom: 8px;">Detalhes da reserva</div>
-          <pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; white-space: pre-wrap; line-height: 1.45; background:#fff; border:1px solid #e5e7eb; border-radius: 12px; padding: 12px; margin:0;">${pre}</pre>
-        </div>
+        ${detailsBlock}
       `,
     });
 
@@ -273,7 +284,7 @@ export async function POST(request: Request) {
       adminTo.length
         ? sendEmailAndRecord({
             to: adminTo,
-            subject: `[ADMIN] ${subject}`,
+            subject: adminSubject,
             html: adminHtml,
             emailType: "RESERVATION_CREATED_ADMIN",
             entityType: "Reservation",
@@ -282,6 +293,10 @@ export async function POST(request: Request) {
           })
         : Promise.resolve(),
     ]);
+
+    if (reservation.paymentStatus === "PAID") {
+      await sendReservationVouchersIfPaid(reservation.id, auth.id).catch(() => null);
+    }
 
     await createAuditLog({
       entityType: "Reservation",

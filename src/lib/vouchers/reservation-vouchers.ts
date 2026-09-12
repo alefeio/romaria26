@@ -3,6 +3,7 @@ import "server-only";
 import QRCode from "qrcode";
 
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { isCustomerPlaceholderEmail } from "@/lib/customer-placeholder-email";
 import {
   buildCustomerAccessBlockHtml,
@@ -214,6 +215,7 @@ export async function sendReservationVouchersIfPaid(
       id: true,
       userId: true,
       paymentStatus: true,
+      totalDue: true,
       customerEmailSnapshot: true,
       customerNameSnapshot: true,
       package: { select: { name: true, departureDate: true, departureTime: true, boardingLocation: true, slug: true } },
@@ -221,7 +223,10 @@ export async function sendReservationVouchersIfPaid(
     },
   });
   if (!reservation) return { ok: false as const, reason: "NOT_FOUND" as const };
-  if (reservation.paymentStatus !== "PAID") return { ok: false as const, reason: "NOT_PAID" as const };
+  const dueIsZero = (reservation.totalDue ?? new Prisma.Decimal(0)).lessThanOrEqualTo(0);
+  if (reservation.paymentStatus !== "PAID" && !dueIsZero) {
+    return { ok: false as const, reason: "NOT_PAID" as const };
+  }
 
   const customerEmail = reservation.customerEmailSnapshot?.trim() ?? "";
   if (!customerEmail || isCustomerPlaceholderEmail(customerEmail)) {

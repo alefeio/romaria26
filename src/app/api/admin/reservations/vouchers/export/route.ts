@@ -2,38 +2,23 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { requireAdminApi } from "@/lib/api-admin-guard";
-import { jsonErr } from "@/lib/http";
 import { buildVouchersListPdf } from "@/lib/vouchers/vouchers-list-pdf";
 
 function ymd(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request) {
   const auth = await requireAdminApi();
   if (auth instanceof Response) return auth;
 
-  const { id } = await params;
-  if (!/^[0-9a-f-]{36}$/i.test(id)) {
-    return jsonErr("VALIDATION_ERROR", "id inválido.", 400);
-  }
-
   const { searchParams } = new URL(request.url);
   const onlyNotExported = searchParams.get("onlyNotExported") === "1" || searchParams.get("onlyNotExported") === "true";
-
-  const pkg = await prisma.package.findUnique({
-    where: { id },
-    select: { id: true, name: true, slug: true, departureDate: true },
-  });
-  if (!pkg) {
-    return jsonErr("NOT_FOUND", "Pacote não encontrado.", 404);
-  }
 
   const now = new Date();
 
   const vouchers = await prisma.reservationVoucher.findMany({
     where: {
-      packageId: id,
       voidedAt: null,
       ...(onlyNotExported ? { exportedAt: null } : {}),
       reservation: { status: { not: "CANCELLED" } },
@@ -45,21 +30,59 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       shirtSize: true,
       hasBreakfastKit: true,
       personType: true,
+      packageId: true,
+      package: { select: { id: true, name: true, slug: true, departureDate: true } },
     },
+    orderBy: [{ package: { departureDate: "asc" } }, { name: "asc" }],
   });
 
+  const byPackage = new Map<
+    string,
+    {
+      packageName: string;
+      departureDate: Date;
+      vouchers: {
+        id: string;
+        code: string;
+        name: string;
+        shirtSize: string;
+        hasBreakfastKit: boolean;
+        personType: "ADULT" | "CHILD";
+      }[];
+    }
+  >();
+
+  for (const v of vouchers) {
+    const key = v.packageId;
+    let group = byPackage.get(key);
+    if (!group) {
+      group = {
+        packageName: v.package.name,
+        departureDate: v.package.departureDate,
+        vouchers: [],
+      };
+      byPackage.set(key, group);
+    }
+    group.vouchers.push({
+      id: v.id,
+      code: v.code,
+      name: v.name,
+      shirtSize: v.shirtSize,
+      hasBreakfastKit: v.hasBreakfastKit,
+      personType: v.personType,
+    });
+  }
+
+  const groups = Array.from(byPackage.values()).sort(
+    (a, b) => a.departureDate.getTime() - b.departureDate.getTime() || a.packageName.localeCompare(b.packageName, "pt-BR")
+  );
+
   const pdfBytes = await buildVouchersListPdf({
-    title: `Lista de vouchers — ${pkg.name}`,
-    subtitle: `Data: ${ymd(pkg.departureDate)} • Exportado em: ${now.toLocaleString("pt-BR")} • Filtro: ${
+    title: "Lista de vouchers — Todos os pacotes",
+    subtitle: `Exportado em: ${now.toLocaleString("pt-BR")} • Filtro: ${
       onlyNotExported ? "Somente não exportados" : "Todos"
-    }`,
-    groups: [
-      {
-        packageName: pkg.name,
-        departureDate: pkg.departureDate,
-        vouchers,
-      },
-    ],
+    } • Pacotes: ${groups.length}`,
+    groups,
   });
 
   const idsToMark = vouchers.map((v) => v.id);
@@ -70,7 +93,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     });
   }
 
-  const filename = `lista-vouchers-${pkg.slug || "pacote"}-${ymd(pkg.departureDate)}.pdf`;
+  const filename = `lista-vouchers-todos-${ymd(now)}.pdf`;
   return new Response(Buffer.from(pdfBytes), {
     status: 200,
     headers: {

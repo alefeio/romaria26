@@ -26,7 +26,8 @@ export async function recalcReservationPaymentStatus(tx: ReservationDbClient, re
   const due = reservation.totalDue ?? new Prisma.Decimal(0);
 
   let status: ReservationPaymentStatus = "UNPAID";
-  if (paid.greaterThanOrEqualTo(due) && due.greaterThan(0)) status = "PAID";
+  // totalDue = 0 (cortesia total / desconto 100%): considerado quitado para liberar vouchers.
+  if (paid.greaterThanOrEqualTo(due)) status = "PAID";
   else if (paid.greaterThan(0) && paid.lessThan(due)) status = "PARTIAL";
   else status = "UNPAID";
 

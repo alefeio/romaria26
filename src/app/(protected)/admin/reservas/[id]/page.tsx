@@ -3,8 +3,10 @@ import Link from "next/link";
 import { ReservationVouchersManager } from "./reservation-vouchers-manager";
 import { ReservationDiscountButton } from "./reservation-discount-button";
 import { requireRole } from "@/lib/auth";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { serializeVoucher } from "@/lib/vouchers/admin-voucher-crud";
+import { releaseReservationVouchersIfPaid } from "@/lib/vouchers/voucher-release";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -26,7 +28,7 @@ export default async function AdminReservaDetailPage({ params }: Props) {
     );
   }
 
-  const r = await prisma.reservation.findUnique({
+  let r = await prisma.reservation.findUnique({
     where: { id },
     include: {
       user: { select: { id: true, name: true, email: true } },
@@ -44,6 +46,39 @@ export default async function AdminReservaDetailPage({ params }: Props) {
         <p className="mt-4">Reserva não encontrada.</p>
       </div>
     );
+  }
+
+  if (r.paymentStatus !== "PAID" && (r.totalDue ?? new Prisma.Decimal(0)).lessThanOrEqualTo(0)) {
+    await prisma.$transaction(async (tx) => {
+      await releaseReservationVouchersIfPaid(tx, id);
+    });
+    r = await prisma.reservation.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        package: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            departureDate: true,
+            departureTime: true,
+            boardingLocation: true,
+          },
+        },
+        vouchers: { where: { voidedAt: null }, orderBy: [{ personType: "asc" }, { personIndex: "asc" }] },
+      },
+    });
+    if (!r) {
+      return (
+        <div className="py-6 text-[var(--text-secondary)]">
+          <Link href="/admin/reservas" className="text-sm text-[var(--igh-primary)] hover:underline">
+            ← Reservas
+          </Link>
+          <p className="mt-4">Reserva não encontrada.</p>
+        </div>
+      );
+    }
   }
 
   return (

@@ -373,7 +373,7 @@ export async function createReservationInTransaction(
         amountChildSnapshot: childUnit,
         totalDue,
         totalPaid: new Prisma.Decimal(0),
-        paymentStatus: "UNPAID",
+        paymentStatus: totalDue.lessThanOrEqualTo(0) ? "PAID" : "UNPAID",
         status: initialStatus,
         notes: notes?.trim() || null,
         kitsDeliveryInfoSnapshot: pkg.kitsDeliveryInfo?.trim() || null,

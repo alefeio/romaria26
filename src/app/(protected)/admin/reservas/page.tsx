@@ -127,11 +127,31 @@ export default function AdminReservasPage() {
             Solicitações de passeios; confirme ou cancele conforme o pagamento.
           </p>
         </div>
-        <Link href="/admin/reservas/nova">
-          <Button type="button" variant="primary">
-            Nova reserva
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() =>
+              window.open("/api/admin/reservations/vouchers/export?onlyNotExported=1", "_blank")
+            }
+            title="Exporta somente vouchers ainda não exportados (todos os pacotes)"
+          >
+            Exportar PDF (novos)
           </Button>
-        </Link>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => window.open("/api/admin/reservations/vouchers/export", "_blank")}
+            title="Exporta todos os vouchers de todos os pacotes"
+          >
+            Exportar PDF (todos)
+          </Button>
+          <Link href="/admin/reservas/nova">
+            <Button type="button" variant="primary">
+              Nova reserva
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">

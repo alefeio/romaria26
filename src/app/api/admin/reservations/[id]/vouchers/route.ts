@@ -1,9 +1,12 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { requireAdminApi } from "@/lib/api-admin-guard";
 import { jsonErr, jsonOk } from "@/lib/http";
 import { adminCreateVoucherSchema } from "@/lib/validators/vouchers";
 import { createAuditLog } from "@/lib/audit";
 import { createReservationVoucherAdmin, serializeVoucher } from "@/lib/vouchers/admin-voucher-crud";
+import { releaseReservationVouchersIfPaid } from "@/lib/vouchers/voucher-release";
+import { ACTIVE_VOUCHER_FILTER } from "@/lib/vouchers/reservation-vouchers";
 
 function isUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
@@ -37,7 +40,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
   const { id } = await ctx.params;
   if (!isUuid(id)) return jsonErr("INVALID_ID", "ID inválido.", 400);
 
-  const reservation = await prisma.reservation.findUnique({
+  let reservation = await prisma.reservation.findUnique({
     where: { id },
     select: {
       id: true,
@@ -53,6 +56,32 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
     },
   });
   if (!reservation) return jsonErr("NOT_FOUND", "Reserva não encontrada.", 404);
+
+  // Cura reservas de cortesia/desconto total antigas que ficaram UNPAID com totalDue = 0.
+  if (
+    reservation.paymentStatus !== "PAID" &&
+    (reservation.totalDue ?? new Prisma.Decimal(0)).lessThanOrEqualTo(0)
+  ) {
+    await prisma.$transaction(async (tx) => {
+      await releaseReservationVouchersIfPaid(tx, id);
+    });
+    reservation = await prisma.reservation.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        packageId: true,
+        adultsCount: true,
+        childrenCount: true,
+        quantity: true,
+        totalPrice: true,
+        totalDue: true,
+        totalPaid: true,
+        paymentStatus: true,
+        vouchers: { where: ACTIVE_VOUCHER_FILTER, orderBy: [{ personType: "asc" }, { personIndex: "asc" }] },
+      },
+    });
+    if (!reservation) return jsonErr("NOT_FOUND", "Reserva não encontrada.", 404);
+  }
 
   return jsonOk({
     reservation: {
