@@ -7,6 +7,7 @@ import { resolvePublicAppUrl } from "@/lib/email";
 import type { SendEmailAttachment } from "@/lib/email";
 import { sendEmailAndRecord } from "@/lib/email/send-and-record";
 import { getEmailBranding, wrapBrandedEmail } from "@/lib/email/branding";
+import { formatDateOnlyWithTime } from "@/lib/format";
 import {
   allocateNextVoucherCode,
   linkVoucherCodeLedger,
@@ -63,7 +64,7 @@ export async function sendCollaboratorVoucherEmail(
     },
   ];
 
-  const when = `${row.package.name} (${row.package.departureDate.toISOString().slice(0, 10)} às ${row.package.departureTime})`;
+  const when = `${row.package.name} (${formatDateOnlyWithTime(row.package.departureDate, row.package.departureTime)})`;
   const branding = await getEmailBranding();
 
   const roleLine = row.roleLabel?.trim()

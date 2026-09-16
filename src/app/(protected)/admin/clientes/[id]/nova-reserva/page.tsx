@@ -8,6 +8,7 @@ import { useToast } from "@/components/feedback/ToastProvider";
 import { PackageReservationForm } from "@/components/site/PackageReservationForm";
 import type { ApiResponse } from "@/lib/api-types";
 import { displayCustomerEmail, isCustomerPlaceholderEmail } from "@/lib/customer-placeholder-email";
+import { formatDateOnly } from "@/lib/format";
 
 type CustomerHead = { id: string; name: string; email: string; phone: string | null; cpf: string | null };
 
@@ -160,7 +161,7 @@ export default function AdminClienteNovaReservaPage() {
                 <option value="">Selecione o pacote…</option>
                 {selectablePackages.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} — saída {formatYmd(p.departureDate)} ({packageStatusLabel(p.status, p.isActive)})
+                    {p.name} — saída {formatDateOnly(p.departureDate)} ({packageStatusLabel(p.status, p.isActive)})
                   </option>
                 ))}
               </select>

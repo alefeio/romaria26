@@ -2,18 +2,13 @@ import { notFound } from "next/navigation";
 import { Section, Button, ImageCarousel } from "@/components/site";
 import { PackageReservationForm } from "@/components/site/PackageReservationForm";
 import { getSessionUserFromCookie } from "@/lib/auth";
+import { formatCalendarDatePt } from "@/lib/format";
 import { getPackageBySlugForPublic, getSiteSettings } from "@/lib/site-data";
 
 type Props = { params: Promise<{ slug: string }> };
 
 function formatDate(d: Date): string {
-  return new Intl.DateTimeFormat("pt-BR", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(d);
+  return formatCalendarDatePt(d, { weekday: "long", month: "long" });
 }
 
 function formatBrl(value: string): string {

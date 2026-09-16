@@ -6,6 +6,7 @@ import { getAppUrl } from "@/lib/email";
 import { getEmailBranding, wrapBrandedEmail } from "@/lib/email/branding";
 import { sendEmailAndRecord } from "@/lib/email/send-and-record";
 import { prisma } from "@/lib/prisma";
+import { formatDateOnlyWithTime } from "@/lib/format";
 
 export type PartialPaymentEmailInput = {
   amount: Prisma.Decimal | string | number;
@@ -88,7 +89,7 @@ export async function sendReservationPartialPaymentCustomerEmail(
   const pending = totalDue.sub(totalPaid);
   const paymentAmount = new Prisma.Decimal(payment.amount.toString());
 
-  const pkgWhen = `${reservation.package.name} (${reservation.package.departureDate.toISOString().slice(0, 10)} às ${reservation.package.departureTime})`;
+  const pkgWhen = `${reservation.package.name} (${formatDateOnlyWithTime(reservation.package.departureDate, reservation.package.departureTime)})`;
   const customerName = escapeHtml(reservation.customerNameSnapshot?.trim() || "Cliente");
   const branding = await getEmailBranding();
   const reservationsUrl = getAppUrl("/cliente/reservas");

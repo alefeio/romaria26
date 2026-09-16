@@ -1,6 +1,8 @@
 /**
  * Datas/horas no fuso de Brasília (BRT, UTC−3, sem horário de verão desde 2019).
  * Use em Server Components e APIs Node onde o padrão costuma ser UTC.
+ * Não use este fuso em campos só-dia (@db.Date / departureDate): Prisma devolve
+ * meia-noite UTC e America/Sao_Paulo recua um dia. Use formatDateOnly / formatDateOnlyWithTime.
  */
 export const BRAZIL_TIMEZONE = "America/Sao_Paulo" as const;
 

@@ -17,6 +17,7 @@ import {
 import { reservationRouteErrorResponse } from "@/lib/reservations/route-errors";
 import { adminCreateReservationForCustomerSchema } from "@/lib/validators/admin-reservation-create";
 import { sendReservationVouchersIfPaid } from "@/lib/vouchers/reservation-vouchers";
+import { formatDateOnlyWithTime } from "@/lib/format";
 
 function buildWhatsAppHref(contactWhatsapp: string | null | undefined, text: string): string | null {
   const digits = (contactWhatsapp ?? "").replace(/\D/g, "");
@@ -161,7 +162,7 @@ export async function POST(request: Request) {
     ]);
 
     const pkgLine = pkg
-      ? `${pkg.name} (${pkg.departureDate.toISOString().slice(0, 10)} às ${pkg.departureTime})`
+      ? `${pkg.name} (${formatDateOnlyWithTime(pkg.departureDate, pkg.departureTime)})`
       : "Passeio";
 
     const adultSizesLine = reservation.adultShirtSizes.length

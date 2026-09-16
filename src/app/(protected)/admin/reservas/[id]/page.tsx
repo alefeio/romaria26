@@ -7,6 +7,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { serializeVoucher } from "@/lib/vouchers/admin-voucher-crud";
 import { releaseReservationVouchersIfPaid } from "@/lib/vouchers/voucher-release";
+import { formatDateOnlyWithTime } from "@/lib/format";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -103,8 +104,7 @@ export default async function AdminReservaDetailPage({ params }: Props) {
             <div className="font-medium">{r.package.name}</div>
             <div className="mt-1 text-[var(--text-muted)]">/{r.package.slug}</div>
             <div className="mt-3">
-              Saída: <span className="font-medium">{r.package.departureDate.toISOString().slice(0, 10)}</span> às{" "}
-              <span className="font-medium">{r.package.departureTime}</span>
+              Saída: <span className="font-medium">{formatDateOnlyWithTime(r.package.departureDate, r.package.departureTime)}</span>
             </div>
             <div className="mt-1">Embarque: {r.package.boardingLocation}</div>
           </div>

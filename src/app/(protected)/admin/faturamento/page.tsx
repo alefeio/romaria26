@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Table, Td, Th } from "@/components/ui/Table";
 import type { ApiResponse } from "@/lib/api-types";
+import { formatDateOnly } from "@/lib/format";
 
 type Billing = {
   range: { from: string | null; to: string | null };
@@ -340,7 +341,7 @@ export default function AdminFaturamentoPage() {
                     </Td>
                     <Td>
                       <div className="font-medium">{i.reservation?.package?.name}</div>
-                      <div className="text-xs text-[var(--text-muted)]">Saída {i.reservation?.package?.departureDate}</div>
+                      <div className="text-xs text-[var(--text-muted)]">Saída {formatDateOnly(i.reservation?.package?.departureDate)}</div>
                     </Td>
                     <Td className="text-right">{brl(i.amount)}</Td>
                     <Td>

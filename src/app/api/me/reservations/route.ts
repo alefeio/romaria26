@@ -10,6 +10,7 @@ import { reservationRouteErrorResponse } from "@/lib/reservations/route-errors";
 import { sendEmailAndRecord } from "@/lib/email/send-and-record";
 import { getEmailBranding, wrapBrandedEmail } from "@/lib/email/branding";
 import { sendReservationVouchersIfPaid } from "@/lib/vouchers/reservation-vouchers";
+import { formatDateOnlyWithTime } from "@/lib/format";
 
 function escapeHtml(s: string): string {
   return String(s ?? "")
@@ -194,7 +195,7 @@ export async function POST(request: Request) {
     ]);
 
     const pkgLine = pkg
-      ? `${pkg.name} (${pkg.departureDate.toISOString().slice(0, 10)} às ${pkg.departureTime})`
+      ? `${pkg.name} (${formatDateOnlyWithTime(pkg.departureDate, pkg.departureTime)})`
       : "Passeio";
 
     const adultSizesLine = reservation.adultShirtSizes.length

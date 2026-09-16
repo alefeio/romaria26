@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Table, Td, Th } from "@/components/ui/Table";
 import type { ApiResponse } from "@/lib/api-types";
+import { formatDateOnlyWithTime } from "@/lib/format";
 
 type Row = {
   id: string;
@@ -102,7 +103,7 @@ export default function ClienteReservasPage() {
                       </Link>
                     </Td>
                     <Td className="text-xs">
-                      {r.package.departureDate} {r.package.departureTime}
+                      {formatDateOnlyWithTime(r.package.departureDate, r.package.departureTime)}
                       <div className="text-[var(--text-muted)]">{r.package.boardingLocation}</div>
                     </Td>
                     <Td>

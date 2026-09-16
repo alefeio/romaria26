@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Table, Td, Th } from "@/components/ui/Table";
 import type { ApiResponse } from "@/lib/api-types";
 import { displayCustomerEmail, isCustomerPlaceholderEmail } from "@/lib/customer-placeholder-email";
+import { formatDateOnly } from "@/lib/format";
 
 type ReservationRow = {
   id: string;
@@ -310,7 +311,7 @@ export default function AdminClienteDetailPage() {
                     <Td className="whitespace-nowrap text-xs">{new Date(r.reservedAt).toLocaleString("pt-BR")}</Td>
                     <Td>
                       <div className="font-medium">{r.package.name}</div>
-                      <div className="text-xs text-[var(--text-muted)]">Saída {r.package.departureDate}</div>
+                      <div className="text-xs text-[var(--text-muted)]">Saída {formatDateOnly(r.package.departureDate)}</div>
                     </Td>
                     <Td className="text-right">{r.quantity}</Td>
                     <Td className="text-right">

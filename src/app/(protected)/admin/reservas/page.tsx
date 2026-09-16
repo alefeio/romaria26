@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Table, Td, Th } from "@/components/ui/Table";
 import type { ApiResponse } from "@/lib/api-types";
+import { formatDateOnly } from "@/lib/format";
 
 type Row = {
   id: string;
@@ -221,7 +222,7 @@ export default function AdminReservasPage() {
                 <Td>
                   <div className="font-medium">{r.package.name}</div>
                   <div className="text-xs text-[var(--text-muted)]">
-                    Saída {r.package.departureDate}
+                    Saída {formatDateOnly(r.package.departureDate)}
                   </div>
                 </Td>
                 <Td>

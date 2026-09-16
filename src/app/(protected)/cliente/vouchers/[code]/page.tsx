@@ -7,20 +7,10 @@ import QRCode from "qrcode";
 import { getSessionUserFromCookie } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolvePublicAppUrl } from "@/lib/email";
-import { BRAZIL_TIMEZONE } from "@/lib/datetime-brazil";
+import { formatDateOnlyWithTime } from "@/lib/format";
 import { ShareVoucherWhatsAppButton } from "@/app/(protected)/share-voucher-whatsapp-button";
 
 type Props = { params: Promise<{ code: string }> };
-
-function formatWhen(d: Date, time: string): string {
-  const date = new Intl.DateTimeFormat("pt-BR", {
-    timeZone: BRAZIL_TIMEZONE,
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(d);
-  return `${date} às ${time}`;
-}
 
 export default async function ClienteVoucherPage({ params }: Props) {
   const user = await getSessionUserFromCookie();
@@ -109,7 +99,7 @@ export default async function ClienteVoucherPage({ params }: Props) {
       <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Meu voucher</h1>
       <p className="mt-1 text-sm text-[var(--text-secondary)]">
         Passeio: <span className="font-medium">{v.reservation.package.name}</span> ·{" "}
-        {formatWhen(v.reservation.package.departureDate, v.reservation.package.departureTime)}
+        {formatDateOnlyWithTime(v.reservation.package.departureDate, v.reservation.package.departureTime)}
       </p>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-[320px_1fr]">

@@ -1,5 +1,6 @@
 import { Card } from "./Card";
 import { Button } from "./Button";
+import { formatCalendarDatePt } from "@/lib/format";
 
 export type PackageCardProps = {
   name: string;
@@ -18,15 +19,6 @@ function formatBrl(value: string): string {
   const n = Number.parseFloat(value);
   if (Number.isNaN(n)) return value;
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-function formatDate(d: Date): string {
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(d);
 }
 
 export function PackageCard(p: PackageCardProps) {
@@ -85,7 +77,7 @@ export function PackageCard(p: PackageCardProps) {
         <ul className="mt-3 space-y-1 text-sm text-[var(--igh-secondary)]">
           <li>
             <span className="text-[var(--igh-muted)]">Saída: </span>
-            {formatDate(p.departureDate)} às {p.departureTime}
+            {formatCalendarDatePt(p.departureDate, { month: "short" })} às {p.departureTime}
           </li>
           <li>
             <span className="text-[var(--igh-muted)]">Embarque: </span>

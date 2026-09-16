@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Table, Td, Th } from "@/components/ui/Table";
 import type { ApiResponse } from "@/lib/api-types";
 import { ReservationDiscountButton } from "../reservation-discount-button";
+import { formatDateOnly } from "@/lib/format";
 
 type Payment = {
   id: string;
@@ -359,7 +360,7 @@ export default function AdminReservaPagamentosPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="font-medium">{header.package.name}</div>
-                <div className="text-xs text-[var(--text-muted)]">Saída {header.package.departureDate}</div>
+                <div className="text-xs text-[var(--text-muted)]">Saída {formatDateOnly(header.package.departureDate)}</div>
                 <div className="mt-2 text-sm text-[var(--text-secondary)]">
                   Cliente: <span className="font-medium text-[var(--text-primary)]">{header.user.name}</span> ({header.user.email})
                 </div>

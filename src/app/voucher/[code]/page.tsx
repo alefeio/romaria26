@@ -5,22 +5,12 @@ import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 
 import { prisma } from "@/lib/prisma";
-import { BRAZIL_TIMEZONE } from "@/lib/datetime-brazil";
 import { getSessionUserFromCookie, verifyPassword } from "@/lib/auth";
 import { resolvePublicAppUrl } from "@/lib/email";
+import { formatDateOnlyWithTime } from "@/lib/format";
 import { findVoucherByCode } from "@/lib/vouchers/find-voucher-by-code";
 
 type Props = { params: Promise<{ code: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
-
-function formatWhen(d: Date, time: string): string {
-  const date = new Intl.DateTimeFormat("pt-BR", {
-    timeZone: BRAZIL_TIMEZONE,
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(d);
-  return `${date} às ${time}`;
-}
 
 function accessDeniedCard(opts: { title: string; body: string; showLogin?: boolean }) {
   return (
@@ -72,7 +62,7 @@ export default async function VoucherPage({ params, searchParams }: Props) {
           </div>
           <h1 className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{collab.package.name}</h1>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            {formatWhen(collab.package.departureDate, collab.package.departureTime)} · Embarque:{" "}
+            {formatDateOnlyWithTime(collab.package.departureDate, collab.package.departureTime)} · Embarque:{" "}
             {collab.package.boardingLocation}
           </p>
 
@@ -219,7 +209,7 @@ export default async function VoucherPage({ params, searchParams }: Props) {
         <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Voucher</div>
         <h1 className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{v.reservation.package.name}</h1>
         <p className="mt-1 text-sm text-[var(--text-secondary)]">
-          {formatWhen(v.reservation.package.departureDate, v.reservation.package.departureTime)} · Embarque:{" "}
+          {formatDateOnlyWithTime(v.reservation.package.departureDate, v.reservation.package.departureTime)} · Embarque:{" "}
           {v.reservation.package.boardingLocation}
         </p>
 

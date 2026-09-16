@@ -13,6 +13,7 @@ import { resolvePublicAppUrl } from "@/lib/email";
 import type { SendEmailAttachment } from "@/lib/email";
 import { sendEmailAndRecord } from "@/lib/email/send-and-record";
 import { getEmailBranding, wrapBrandedEmail } from "@/lib/email/branding";
+import { formatDateOnlyWithTime } from "@/lib/format";
 import { releaseReservationVouchersIfPaid } from "@/lib/vouchers/voucher-release";
 import { NO_SHIRT_LABEL, isFreeChildAge } from "@/lib/vouchers/shirt";
 
@@ -278,7 +279,7 @@ export async function sendReservationVouchersIfPaid(
   const adminTo = adminUsers.map((u) => u.email).filter(Boolean);
 
   const publicUrl = await resolvePublicAppUrl();
-  const when = `${reservation.package.name} (${reservation.package.departureDate.toISOString().slice(0, 10)} às ${reservation.package.departureTime})`;
+  const when = `${reservation.package.name} (${formatDateOnlyWithTime(reservation.package.departureDate, reservation.package.departureTime)})`;
   const branding = await getEmailBranding();
 
   let temporaryPassword: string | null = null;

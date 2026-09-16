@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Table, Td, Th } from "@/components/ui/Table";
 import type { ApiResponse } from "@/lib/api-types";
+import { formatDateOnlyWithTime } from "@/lib/format";
 
 type Row = {
   id: string;
@@ -100,7 +101,7 @@ export default function AdminPacotesPage() {
                   <div className="text-xs text-[var(--text-muted)]">/{p.slug}</div>
                 </Td>
                 <Td>
-                  {p.departureDate?.slice(0, 10)} {p.departureTime}
+                  {formatDateOnlyWithTime(p.departureDate, p.departureTime)}
                 </Td>
                 <Td>{p.capacity}</Td>
                 <Td>
