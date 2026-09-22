@@ -5,6 +5,7 @@ import {
   verifyPassword,
   AUTH_TOKEN_COOKIE_NAME,
   getAuthCookieOptions,
+  sessionMaxAgeSecondsForRole,
   type SessionUser,
 } from "@/lib/auth";
 import type { UserRole } from "@/generated/prisma/client";
@@ -72,7 +73,11 @@ export async function POST(request: Request) {
         needsRoleChoice: false,
       },
     });
-    res.cookies.set(AUTH_TOKEN_COOKIE_NAME, token, getAuthCookieOptions());
+    res.cookies.set(
+      AUTH_TOKEN_COOKIE_NAME,
+      token,
+      getAuthCookieOptions(sessionMaxAgeSecondsForRole(sessionUser.role))
+    );
     return res;
   } catch (e) {
     console.error("[auth/login]", e);

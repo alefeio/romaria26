@@ -11,13 +11,20 @@ import type { User, UserRole } from "@/generated/prisma/client";
 export const AUTH_TOKEN_COOKIE_NAME = "auth_token";
 const AUTH_SECRET = new TextEncoder().encode(process.env.AUTH_SECRET || "dev-secret-change-me");
 
-export function getAuthCookieOptions() {
+const DEFAULT_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+const SELLER_SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
+
+export function sessionMaxAgeSecondsForRole(role: UserRole | string | undefined): number {
+  return role === "SELLER" ? SELLER_SESSION_MAX_AGE_SECONDS : DEFAULT_SESSION_MAX_AGE_SECONDS;
+}
+
+export function getAuthCookieOptions(maxAgeSeconds?: number) {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: maxAgeSeconds ?? DEFAULT_SESSION_MAX_AGE_SECONDS,
   };
 }
 
@@ -47,6 +54,7 @@ export async function buildAuthSessionToken(
   effectiveRole?: UserRole
 ): Promise<string> {
   const role = effectiveRole ?? user.role;
+  const maxAge = sessionMaxAgeSecondsForRole(role);
   return new SignJWT({
     name: user.name,
     email: user.email,
@@ -55,7 +63,7 @@ export async function buildAuthSessionToken(
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
     .setIssuedAt()
-    .setExpirationTime("7d")
+    .setExpirationTime(`${maxAge}s`)
     .sign(AUTH_SECRET);
 }
 
@@ -64,9 +72,10 @@ export async function createSessionCookie(
   user: SessionUser & { isAdmin?: boolean },
   effectiveRole?: UserRole
 ): Promise<void> {
+  const role = effectiveRole ?? user.role;
   const token = await buildAuthSessionToken(user, effectiveRole);
   const cookieStore = await cookies();
-  cookieStore.set(AUTH_TOKEN_COOKIE_NAME, token, getAuthCookieOptions());
+  cookieStore.set(AUTH_TOKEN_COOKIE_NAME, token, getAuthCookieOptions(sessionMaxAgeSecondsForRole(role)));
 }
 
 export async function clearSessionCookie(): Promise<void> {
@@ -132,4 +141,8 @@ export async function requireRole(roles: UserRole | UserRole[]): Promise<Session
     throw new Error("FORBIDDEN");
   }
   return user;
+}
+
+export async function requireSeller(): Promise<SessionUser> {
+  return requireRole("SELLER");
 }

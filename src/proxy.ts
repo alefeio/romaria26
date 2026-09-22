@@ -30,7 +30,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const dashboardUrl = new URL("/dashboard", request.url);
+  const dashboardUrl = new URL(role === "SELLER" ? "/vendedor" : "/dashboard", request.url);
+
+  if (pathname.startsWith("/vendedor")) {
+    if (role !== "SELLER") {
+      return NextResponse.redirect(new URL(role === "CUSTOMER" ? "/cliente/dashboard" : "/dashboard", request.url));
+    }
+  }
 
   if (pathname.startsWith("/users")) {
     if (role !== "MASTER" && role !== "ADMIN") {
@@ -38,15 +44,18 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  if (pathname.startsWith("/admin/site") || pathname.startsWith("/admin/sms") || pathname.startsWith("/admin/email")) {
+  if (pathname.startsWith("/admin")) {
     if (role !== "MASTER" && role !== "ADMIN") {
       return NextResponse.redirect(dashboardUrl);
     }
   }
 
-  if (pathname.startsWith("/admin/pacotes") || pathname.startsWith("/admin/reservas") || pathname.startsWith("/admin/tablet")) {
-    if (role !== "MASTER" && role !== "ADMIN") {
-      return NextResponse.redirect(dashboardUrl);
+  if (pathname.startsWith("/dashboard")) {
+    if (role === "SELLER") {
+      return NextResponse.redirect(new URL("/vendedor", request.url));
+    }
+    if (role === "CUSTOMER") {
+      return NextResponse.redirect(new URL("/cliente/dashboard", request.url));
     }
   }
 
@@ -67,12 +76,9 @@ export const config = {
     "/trocar-senha/:path*",
     "/escolher-perfil/:path*",
     "/suporte/:path*",
-    "/admin/site/:path*",
-    "/admin/sms/:path*",
-    "/admin/email/:path*",
-    "/admin/pacotes/:path*",
-    "/admin/reservas/:path*",
-    "/admin/tablet/:path*",
+    "/admin/:path*",
+    "/vendedor",
+    "/vendedor/:path*",
     "/cliente/:path*",
   ],
 };

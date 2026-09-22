@@ -9,14 +9,17 @@ type Item = {
   masterOnly?: boolean;
   adminOrMaster?: boolean;
   customerOnly?: boolean;
+  sellerOnly?: boolean;
   alwaysShow?: boolean;
   category?: string;
 };
 
-/** Menu do painel: apenas cliente, operação de passeios/reservas, site institucional e tarefas de master. */
+/** Menu do painel: cliente, vendedora, operação de passeios/reservas, site institucional e master. */
 const ITEMS: Item[] = [
   { href: "/cliente/dashboard", label: "Área do cliente", customerOnly: true, category: "Cliente" },
   { href: "/cliente/reservas", label: "Minhas reservas", customerOnly: true, category: "Cliente" },
+  { href: "/vendedor", label: "Nova venda", sellerOnly: true, category: "Balcão" },
+  { href: "/vendedor/vendas", label: "Minhas vendas", sellerOnly: true, category: "Balcão" },
   { href: "/dashboard", label: "Painel", alwaysShow: true, category: "Início" },
   { href: "/admin/pacotes", label: "Pacotes", adminOrMaster: true, category: "Operação" },
   { href: "/admin/reservas", label: "Reservas", adminOrMaster: true, category: "Operação" },
@@ -50,8 +53,8 @@ export function Sidebar({
   user: {
     name: string;
     email: string;
-    role: "MASTER" | "ADMIN" | "CUSTOMER";
-    baseRole?: "MASTER" | "ADMIN" | "CUSTOMER";
+    role: "MASTER" | "ADMIN" | "SELLER" | "CUSTOMER";
+    baseRole?: "MASTER" | "ADMIN" | "SELLER" | "CUSTOMER";
     isAdmin?: boolean;
     availableRoles?: { canMaster: boolean; canAdmin: boolean; canCustomer?: boolean };
   };
@@ -65,7 +68,10 @@ export function Sidebar({
     if (user.role === "CUSTOMER") {
       return i.customerOnly === true;
     }
-    if (i.customerOnly) return false;
+    if (user.role === "SELLER") {
+      return i.sellerOnly === true;
+    }
+    if (i.customerOnly || i.sellerOnly) return false;
     if (i.alwaysShow) return true;
     if (i.masterOnly) return user.role === "MASTER";
     if (i.adminOrMaster) return user.role === "ADMIN" || user.role === "MASTER";
@@ -79,7 +85,7 @@ export function Sidebar({
     return acc;
   }, {});
 
-  const categoryOrder = ["Cliente", "Início", "Operação", "Administração", "Site", "Sistema", "Menu"];
+  const categoryOrder = ["Cliente", "Balcão", "Início", "Operação", "Administração", "Site", "Sistema", "Menu"];
 
   const navContent = (
     <ul className="flex list-none flex-col gap-4 pl-0">

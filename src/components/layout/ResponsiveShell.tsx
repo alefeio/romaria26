@@ -15,8 +15,8 @@ export function ResponsiveShell({
     id: string;
     name: string;
     email: string;
-    role: "MASTER" | "ADMIN" | "CUSTOMER";
-    baseRole?: "MASTER" | "ADMIN" | "CUSTOMER";
+    role: "MASTER" | "ADMIN" | "SELLER" | "CUSTOMER";
+    baseRole?: "MASTER" | "ADMIN" | "SELLER" | "CUSTOMER";
     isAdmin?: boolean;
     availableRoles?: {
       canMaster: boolean;

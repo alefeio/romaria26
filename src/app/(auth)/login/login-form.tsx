@@ -36,7 +36,7 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
       });
       const raw = await res.text();
       let json: ApiResponse<{
-        user: { id: string; mustChangePassword?: boolean };
+        user: { id: string; mustChangePassword?: boolean; role?: string };
         needsRoleChoice?: boolean;
       }>;
       try {
@@ -61,7 +61,8 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
       if (json.data?.user?.mustChangePassword) {
         router.replace(redirectTo ? `/trocar-senha?from=${encodeURIComponent(redirectTo)}` : "/trocar-senha");
       } else {
-        const path = redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//") ? redirectTo : "/dashboard";
+        const fallback = json.data?.user?.role === "SELLER" ? "/vendedor" : "/dashboard";
+        const path = redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//") ? redirectTo : fallback;
         router.replace(path);
       }
     } finally {

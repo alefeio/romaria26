@@ -10,7 +10,9 @@ export const metadata = {
 
 export default async function MeusDadosPage() {
   const user = await getSessionUserFromCookie();
-  if (!user || user.role !== "CUSTOMER") {
+  if (!user) redirect("/login");
+  if (user.role === "SELLER") redirect("/vendedor");
+  if (user.role !== "CUSTOMER") {
     redirect("/login");
   }
   return (

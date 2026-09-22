@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { DashboardHero, SectionCard, TableShell } from "@/components/dashboard/DashboardUI";
 import { useToast } from "@/components/feedback/ToastProvider";
+import { useUser } from "@/components/layout/UserProvider";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
@@ -17,7 +18,7 @@ type AdminUser = {
   id: string;
   name: string;
   email: string;
-  role: "ADMIN" | "MASTER" | "CUSTOMER";
+  role: "ADMIN" | "MASTER" | "CUSTOMER" | "SELLER";
   isAdmin?: boolean;
   isActive: boolean;
   createdAt: string;
@@ -30,12 +31,15 @@ function isMasterRow(u: AdminUser): boolean {
 function adminProfileLabel(u: AdminUser): string {
   if (u.role === "MASTER") return "Master";
   if (u.role === "ADMIN") return "Administrador";
+  if (u.role === "SELLER") return "Vendedora (shopping)";
   if (u.isAdmin) return "Cliente com acesso admin";
   return u.role;
 }
 
 export default function UsersPage() {
   const toast = useToast();
+  const sessionUser = useUser();
+  const canCreateSeller = sessionUser.role === "MASTER";
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [showInactive, setShowInactive] = useState(false);
@@ -45,6 +49,7 @@ export default function UsersPage() {
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [createRole, setCreateRole] = useState<"ADMIN" | "SELLER">("ADMIN");
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPassword, setEditPassword] = useState("");
@@ -175,7 +180,7 @@ export default function UsersPage() {
       const res = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, email }),
+        body: JSON.stringify({ name, email, role: canCreateSeller ? createRole : "ADMIN" }),
       });
       const json = (await res.json()) as ApiResponse<{
         user: { id: string };
@@ -184,7 +189,7 @@ export default function UsersPage() {
         alreadyRegisteredAs?: string;
       }>;
       if (!res.ok || !json.ok) {
-        toast.push("error", !json.ok ? json.error.message : "Falha ao criar admin.");
+        toast.push("error", !json.ok ? json.error.message : "Falha ao criar usuário.");
         return;
       }
       if (json.data.alreadyRegisteredAs) {
@@ -217,7 +222,7 @@ export default function UsersPage() {
       <DashboardHero
         eyebrow="Administração"
         title="Usuários admin"
-        description='Crie e edite contas administrativas (perfil Administrador). O sistema mantém uma única conta Master; ela aparece na lista apenas para referência e não pode ser criada, editada ou inativada aqui. Por padrão, só ativos — use "Exibir inativos" para reativar ou excluir.'
+        description='Crie e edite contas administrativas e de vendedora. O Master não pode ser editado aqui. Por padrão, só ativos — use "Exibir inativos" para reativar ou excluir.'
         rightSlot={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
             <Button
@@ -228,7 +233,7 @@ export default function UsersPage() {
             >
               {showInactive ? "Ocultar inativos" : "Exibir inativos"}
             </Button>
-            <Button onClick={() => setOpen(true)} className="w-full sm:w-auto">
+            <Button onClick={() => { setCreateRole("ADMIN"); setOpen(true); }} className="w-full sm:w-auto">
               Novo administrador
             </Button>
           </div>
@@ -382,8 +387,21 @@ export default function UsersPage() {
         </form>
       </Modal>
 
-      <Modal open={open} title="Novo administrador" onClose={() => { setOpen(false); setName(""); setEmail(""); }}>
+      <Modal open={open} title={createRole === "SELLER" ? "Nova vendedora" : "Novo administrador"} onClose={() => { setOpen(false); setName(""); setEmail(""); setCreateRole("ADMIN"); }}>
         <form className="flex flex-col gap-3" onSubmit={createAdmin}>
+          {canCreateSeller ? (
+            <div>
+              <label className="text-sm font-medium">Perfil</label>
+              <select
+                className="mt-1 w-full rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm"
+                value={createRole}
+                onChange={(e) => setCreateRole(e.target.value as "ADMIN" | "SELLER")}
+              >
+                <option value="ADMIN">Administrador</option>
+                <option value="SELLER">Vendedora (shopping)</option>
+              </select>
+            </div>
+          ) : null}
           <div>
             <label className="text-sm font-medium">Nome</label>
             <div className="mt-1">
@@ -397,7 +415,9 @@ export default function UsersPage() {
             </div>
           </div>
           <p className="text-xs text-[var(--text-muted)]">
-            Será criada uma conta com perfil <strong className="font-medium">Administrador</strong> (não Master). Uma senha temporária será gerada e enviada por e-mail; o usuário deverá trocá-la no primeiro acesso.
+            {createRole === "SELLER"
+              ? "A vendedora acessa só o balcão (cadastro, reserva no preço do pacote ativo e recebimento integral). Uma senha temporária será enviada por e-mail."
+              : "Será criada uma conta com perfil Administrador (não Master). Uma senha temporária será gerada e enviada por e-mail; o usuário deverá trocá-la no primeiro acesso."}
           </p>
           <div className="flex items-center justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>

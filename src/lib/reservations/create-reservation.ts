@@ -43,6 +43,10 @@ export type CreateReservationInput = {
    * Continua validando capacidade e existência do pacote.
    */
   allowUnavailablePackage?: boolean;
+  /** Balcão da vendedora: ignora cortesia e camisa opcional paga. */
+  allowCourtesy?: boolean;
+  /** Quem lançou (admin/vendedora). Nulo = reserva pelo site. */
+  soldByUserId?: string | null;
 };
 
 export class ReservationCreateError extends Error {
@@ -98,6 +102,8 @@ export async function createReservationInTransaction(
     notes,
     initialStatus = "PENDING",
     allowUnavailablePackage = false,
+    allowCourtesy = true,
+    soldByUserId = null,
   } = input;
 
   if (!isUuid(packageId) || !isUuid(userId)) {
@@ -136,10 +142,11 @@ export async function createReservationInTransaction(
   if (adultSizes.length !== adultsCount) {
     throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "Informe o tamanho da camisa para cada adulto.");
   }
-  const adultCourtesies =
-    Array.isArray(adultCourtesySelections) && adultCourtesySelections.length === adultsCount
+  const adultCourtesies = allowCourtesy
+    ? Array.isArray(adultCourtesySelections) && adultCourtesySelections.length === adultsCount
       ? adultCourtesySelections.map((v) => Boolean(v))
-      : Array.from({ length: adultsCount }, () => false);
+      : Array.from({ length: adultsCount }, () => false)
+    : Array.from({ length: adultsCount }, () => false);
 
   if (!Array.isArray(childrenNames) || childrenNames.length !== childrenCount) {
     throw new ReservationCreateError("INVALID_CUSTOMER_DATA", "Informe o nome completo para cada criança.");
@@ -164,18 +171,21 @@ export async function createReservationInTransaction(
     );
   }
   const childNums = childrenShirtNumbers.map((n) => (typeof n === "number" ? n : Number(n)));
-  const childCourtesies =
-    Array.isArray(childrenCourtesySelections) && childrenCourtesySelections.length === childrenCount
+  const childCourtesies = allowCourtesy
+    ? Array.isArray(childrenCourtesySelections) && childrenCourtesySelections.length === childrenCount
       ? childrenCourtesySelections.map((v) => Boolean(v))
-      : Array.from({ length: childrenCount }, () => false);
-  const childOptionalIncluded =
-    Array.isArray(childrenOptionalShirtIncluded) && childrenOptionalShirtIncluded.length === childrenCount
+      : Array.from({ length: childrenCount }, () => false)
+    : Array.from({ length: childrenCount }, () => false);
+  const childOptionalIncluded = allowCourtesy
+    ? Array.isArray(childrenOptionalShirtIncluded) && childrenOptionalShirtIncluded.length === childrenCount
       ? childrenOptionalShirtIncluded.map((v) => Boolean(v))
-      : Array.from({ length: childrenCount }, () => false);
-  const childOptionalPrices =
-    Array.isArray(childrenOptionalShirtPrices) && childrenOptionalShirtPrices.length === childrenCount
+      : Array.from({ length: childrenCount }, () => false)
+    : Array.from({ length: childrenCount }, () => false);
+  const childOptionalPrices = allowCourtesy
+    ? Array.isArray(childrenOptionalShirtPrices) && childrenOptionalShirtPrices.length === childrenCount
       ? childrenOptionalShirtPrices.map((n) => (typeof n === "number" ? n : Number(n)))
-      : Array.from({ length: childrenCount }, () => 0);
+      : Array.from({ length: childrenCount }, () => 0)
+    : Array.from({ length: childrenCount }, () => 0);
 
   for (let i = 0; i < childrenCount; i++) {
     const age = childAgeNums[i] ?? 0;
@@ -265,7 +275,7 @@ export async function createReservationInTransaction(
     // Regra: reservas pendentes seguram vaga por 24h; após isso, cancelam automaticamente.
     const expiry = new Date(Date.now() - 24 * 60 * 60 * 1000);
     await tx.reservation.updateMany({
-      where: { packageId, status: "PENDING", reservedAt: { lt: expiry } },
+      where: { packageId, status: "PENDING", paymentStatus: { not: "PAID" }, reservedAt: { lt: expiry } },
       data: { status: "CANCELLED", confirmedAt: null },
     });
 
@@ -379,6 +389,8 @@ export async function createReservationInTransaction(
         kitsDeliveryInfoSnapshot: pkg.kitsDeliveryInfo?.trim() || null,
         reservedAt: now,
         confirmedAt,
+        soldByUserId: soldByUserId && isUuid(soldByUserId) ? soldByUserId : null,
+        soldAt: soldByUserId && isUuid(soldByUserId) ? now : null,
       },
     });
 
@@ -426,7 +438,7 @@ export async function getPackageRemainingCapacity(
   // Expirar pendentes antigos (24h) para devolver vaga automaticamente.
   const expiry = new Date(Date.now() - 24 * 60 * 60 * 1000);
   await prisma.reservation.updateMany({
-    where: { packageId, status: "PENDING", reservedAt: { lt: expiry } },
+    where: { packageId, status: "PENDING", paymentStatus: { not: "PAID" }, reservedAt: { lt: expiry } },
     data: { status: "CANCELLED", confirmedAt: null },
   });
 

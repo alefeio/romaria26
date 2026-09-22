@@ -13,7 +13,7 @@ export async function GET() {
   await requireRole(["ADMIN", "MASTER"]);
 
   const users = await prisma.user.findMany({
-    where: { OR: [{ role: "ADMIN" }, { role: "MASTER" }, { isAdmin: true }] },
+    where: { OR: [{ role: "ADMIN" }, { role: "MASTER" }, { role: "SELLER" }, { isAdmin: true }] },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -39,17 +39,24 @@ export async function POST(request: Request) {
     return jsonErr("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Dados inválidos", 400);
   }
 
-  const { name, email } = parsed.data;
+  const { name, email, role } = parsed.data;
+  if (role === "SELLER" && actor.role !== "MASTER") {
+    return jsonErr("FORBIDDEN", "Somente o Master pode criar vendedora.", 403);
+  }
+
   const existing = await prisma.user.findUnique({
     where: { email },
     select: { id: true, name: true, email: true, role: true, isActive: true, isAdmin: true },
   });
 
   if (existing) {
-    if (existing.role === "ADMIN" || existing.role === "MASTER") {
-      return jsonErr("EMAIL_IN_USE", "Já existe um usuário administrador com este e-mail.", 409);
+    if (existing.role === "ADMIN" || existing.role === "MASTER" || existing.role === "SELLER") {
+      return jsonErr("EMAIL_IN_USE", "Já existe um usuário interno com este e-mail.", 409);
     }
     if (existing.role === "CUSTOMER") {
+      if (role === "SELLER") {
+        return jsonErr("EMAIL_IN_USE", "Este e-mail já pertence a um cliente. Use outro e-mail para a vendedora.", 409);
+      }
       if (existing.isAdmin) {
         return jsonErr("EMAIL_IN_USE", "Este usuário já possui acesso como Admin.", 409);
       }
@@ -83,7 +90,7 @@ export async function POST(request: Request) {
       name,
       email,
       passwordHash,
-      role: "ADMIN",
+      role: role === "SELLER" ? "SELLER" : "ADMIN",
       isActive: true,
       mustChangePassword: true,
     },

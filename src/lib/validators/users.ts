@@ -3,6 +3,7 @@ import { z } from "zod";
 export const createAdminSchema = z.object({
   name: z.string().min(2, "Nome é obrigatório"),
   email: z.string().email("E-mail inválido").toLowerCase(),
+  role: z.enum(["ADMIN", "SELLER"]).optional().default("ADMIN"),
 });
 
 export const updateAdminSchema = z.object({

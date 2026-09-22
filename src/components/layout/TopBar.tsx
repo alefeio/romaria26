@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import type { ApiResponse } from "@/lib/api-types";
 
 type RoleOption = {
-  value: "ADMIN" | "MASTER" | "CUSTOMER";
+  value: "ADMIN" | "MASTER" | "CUSTOMER" | "SELLER";
   label: string;
 };
 
@@ -20,8 +20,8 @@ export function TopBar({
     id: string;
     name: string;
     email: string;
-    role: "MASTER" | "ADMIN" | "CUSTOMER";
-    baseRole?: "MASTER" | "ADMIN" | "CUSTOMER";
+    role: "MASTER" | "ADMIN" | "SELLER" | "CUSTOMER";
+    baseRole?: "MASTER" | "ADMIN" | "SELLER" | "CUSTOMER";
     isAdmin?: boolean;
     availableRoles?: {
       canMaster: boolean;
@@ -45,6 +45,7 @@ export function TopBar({
     MASTER: "Administrador Master",
     ADMIN: "Admin (site)",
     CUSTOMER: "Cliente",
+    SELLER: "Vendedora (shopping)",
   };
 
   let roleOptions: RoleOption[] = [
@@ -82,6 +83,11 @@ export function TopBar({
   return (
     <div className="flex shrink-0 items-center justify-end gap-2 px-3 py-2">
       <div className="relative flex items-center gap-2">
+        {user.role === "SELLER" ? (
+          <Button variant="secondary" size="sm" onClick={logout} disabled={loading}>
+            Sair
+          </Button>
+        ) : null}
         <ThemeToggle aria-label="Alternar tema" />
         <div className="relative">
           <button
@@ -136,6 +142,8 @@ export function TopBar({
                   <ThemeToggle showLabel className="w-full justify-start" />
                 </div>
                 <ul className="list-none space-y-0.5 py-3 pl-0">
+                  {user.role !== "SELLER" ? (
+                  <>
                   <li>
                     <Link
                       href="/"
@@ -154,6 +162,8 @@ export function TopBar({
                       Meus dados
                     </Link>
                   </li>
+                  </>
+                  ) : null}
                 </ul>
                 <div className="pt-2">
                   <Button variant="secondary" className="w-full" onClick={logout} disabled={loading}>

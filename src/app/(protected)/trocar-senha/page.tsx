@@ -5,12 +5,14 @@ import { useState } from "react";
 
 import { DashboardHero, SectionCard } from "@/components/dashboard/DashboardUI";
 import { useToast } from "@/components/feedback/ToastProvider";
+import { useUser } from "@/components/layout/UserProvider";
 import { Button } from "@/components/ui/Button";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import type { ApiResponse } from "@/lib/api-types";
 
 export default function TrocarSenhaPage() {
   const searchParams = useSearchParams();
+  const user = useUser();
   const toast = useToast();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -42,8 +44,9 @@ export default function TrocarSenhaPage() {
       }
       toast.push("success", "Senha alterada com sucesso.");
       const from = searchParams.get("from");
+      const fallback = user.role === "SELLER" ? "/vendedor" : "/dashboard";
       const redirectTo =
-        typeof from === "string" && from.startsWith("/") && !from.startsWith("//") ? from : "/dashboard";
+        typeof from === "string" && from.startsWith("/") && !from.startsWith("//") ? from : fallback;
       window.location.href = redirectTo;
       return;
     } finally {

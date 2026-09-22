@@ -20,11 +20,13 @@ type Row = {
   totalPrice: string;
   discountAmount: string;
   totalDue: string;
+  paymentStatus?: string;
   status: string;
   notes: string | null;
   reservedAt: string;
   confirmedAt: string | null;
   user: { name: string; email: string };
+  soldByUser: { id: string; name: string; email: string; role: string } | null;
   package: { name: string; slug: string; departureDate: string };
 };
 
@@ -51,6 +53,8 @@ export default function AdminReservasPage() {
   const [items, setItems] = useState<Row[]>([]);
   const [filter, setFilter] = useState("");
   const [q, setQ] = useState("");
+  const [soldByUserId, setSoldByUserId] = useState("");
+  const [sellers, setSellers] = useState<{ id: string; name: string; email: string }[]>([]);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
 
@@ -60,6 +64,7 @@ export default function AdminReservasPage() {
       const qs = new URLSearchParams();
       if (filter) qs.set("status", filter);
       if (q.trim()) qs.set("q", q.trim());
+      if (soldByUserId) qs.set("soldByUserId", soldByUserId);
       const query = qs.toString();
       const res = await fetch(`/api/admin/reservations${query ? `?${query}` : ""}`);
       const json = (await res.json()) as ApiResponse<{ items: Row[] }>;
@@ -71,7 +76,16 @@ export default function AdminReservasPage() {
     } finally {
       setLoading(false);
     }
-  }, [filter, q, toast]);
+  }, [filter, q, soldByUserId, toast]);
+
+  useEffect(() => {
+    void fetch("/api/admin/sellers")
+      .then(async (res) => {
+        const json = (await res.json()) as ApiResponse<{ items: { id: string; name: string; email: string }[] }>;
+        if (res.ok && json.ok) setSellers(json.data.items);
+      })
+      .catch(() => null);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -125,7 +139,8 @@ export default function AdminReservasPage() {
         <div>
           <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Reservas</h1>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            Solicitações de passeios; confirme ou cancele conforme o pagamento.
+            Solicitações de passeios; confirme ou cancele conforme o pagamento. Filtre por vendedora para conferir o
+            que foi lançado no shopping.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -186,6 +201,23 @@ export default function AdminReservasPage() {
       </div>
 
       <div className="mt-3 max-w-md">
+        <label className="text-sm font-medium text-[var(--text-primary)]">Vendedora</label>
+        <select
+          className="mt-1 w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm"
+          value={soldByUserId}
+          onChange={(e) => setSoldByUserId(e.target.value)}
+        >
+          <option value="">Todas (site + balcão)</option>
+          <option value="none">Somente site (sem vendedora)</option>
+          {sellers.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mt-3 max-w-md">
         <label className="text-sm font-medium text-[var(--text-primary)]">Filtrar por nome</label>
         <input
           value={q}
@@ -200,12 +232,27 @@ export default function AdminReservasPage() {
         <p className="mt-6 text-[var(--text-secondary)]">Carregando…</p>
       ) : (
         <div className="mt-6">
+        {soldByUserId && soldByUserId !== "none" ? (
+          <div className="mb-4 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 text-sm">
+            <p className="font-medium text-[var(--text-primary)]">Resumo desta vendedora (lista atual)</p>
+            <p className="mt-1 text-[var(--text-secondary)]">
+              {items.filter((i) => i.status !== "CANCELLED").length} reserva(s) ·{" "}
+              {brl(
+                items
+                  .filter((i) => i.status !== "CANCELLED")
+                  .reduce((n, i) => n + (Number.parseFloat(i.totalDue) || 0), 0)
+              )}{" "}
+              em valores lançados
+            </p>
+          </div>
+        ) : null}
         <Table>
           <thead>
             <tr>
               <Th>Data</Th>
               <Th>Pacote</Th>
               <Th>Cliente</Th>
+              <Th>Lançado por</Th>
               <Th>Conta</Th>
               <Th>Qtd</Th>
               <Th>Total</Th>
@@ -229,6 +276,18 @@ export default function AdminReservasPage() {
                   <div>{r.customerNameSnapshot}</div>
                   <div className="text-xs text-[var(--text-muted)]">{r.customerEmailSnapshot}</div>
                   <div className="text-xs text-[var(--text-muted)]">{r.customerPhoneSnapshot}</div>
+                </Td>
+                <Td className="text-xs">
+                  {r.soldByUser ? (
+                    <>
+                      <div className="font-medium text-[var(--text-primary)]">{r.soldByUser.name}</div>
+                      <div className="text-[var(--text-muted)]">
+                        {r.soldByUser.role === "SELLER" ? "Vendedora" : r.soldByUser.role}
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-[var(--text-muted)]">Site</span>
+                  )}
                 </Td>
                 <Td className="text-xs text-[var(--text-muted)]">{r.user.email}</Td>
                 <Td>

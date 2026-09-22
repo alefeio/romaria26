@@ -7,7 +7,7 @@ datasource db {
   provider = "postgresql"
 }
 
-/// Contas: apenas MASTER (tudo), ADMIN (site e conteúdo) e CUSTOMER (reservas).
+/// Contas: MASTER (tudo), ADMIN (site e operação), SELLER (balcão do shopping) e CUSTOMER (reservas).
 model User {
   id                          String              @id @default(uuid())
   name                        String
@@ -37,6 +37,7 @@ model User {
   emailCampaignsCanceled      EmailCampaign[]     @relation("EmailCampaignCanceledBy")
   emailTemplatesCreated       EmailTemplate[]     @relation("EmailTemplateCreatedBy")
   reservations                Reservation[]
+  soldReservations            Reservation[]       @relation("ReservationSoldBy")
   supportTicketMessages       SupportTicketMessage[] @relation("SupportTicketMessageAuthor")
 }
 
@@ -124,7 +125,11 @@ model Reservation {
   confirmedAt                   DateTime?
   createdAt                     DateTime          @default(now())
   updatedAt                     DateTime          @updatedAt
+  /** Quem lançou a reserva no painel/balcão (nulo = venda pelo site). */
+  soldByUserId                  String?
+  soldAt                        DateTime?
   user                          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  soldByUser                    User?             @relation("ReservationSoldBy", fields: [soldByUserId], references: [id], onDelete: SetNull)
   package                       Package           @relation(fields: [packageId], references: [id], onDelete: Restrict)
   payments                      ReservationPayment[]
   installments                  ReservationInstallment[]
@@ -133,6 +138,7 @@ model Reservation {
   @@index([userId])
   @@index([packageId])
   @@index([packageId, status])
+  @@index([soldByUserId])
 }
 
 model ReservationVoucher {
@@ -626,6 +632,7 @@ model PendingSiteChange {
 enum UserRole {
   MASTER
   ADMIN
+  SELLER
   CUSTOMER
 }
 

@@ -18,6 +18,10 @@ export default async function DashboardPage() {
     redirect("/cliente/dashboard");
   }
 
+  if (user.role === "SELLER") {
+    redirect("/vendedor");
+  }
+
   if (user.role !== "ADMIN" && user.role !== "MASTER") {
     redirect("/login");
   }

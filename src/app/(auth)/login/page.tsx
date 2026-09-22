@@ -15,7 +15,7 @@ export default async function LoginPage({ searchParams }: Props) {
   const { from } = await searchParams;
   const redirectTo = normalizeRedirectFrom(from);
   if (session) {
-    redirect(redirectTo ?? "/dashboard");
+    redirect(redirectTo ?? (session.role === "SELLER" ? "/vendedor" : "/dashboard"));
   }
 
   return (

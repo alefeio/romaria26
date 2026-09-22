@@ -1,5 +1,6 @@
 import "server-only";
 
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminApi } from "@/lib/api-admin-guard";
 import { jsonErr, jsonOk } from "@/lib/http";
@@ -33,18 +34,20 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
   const packageId = searchParams.get("packageId");
+  const soldByUserId = searchParams.get("soldByUserId");
   const q = (searchParams.get("q") ?? "").trim();
 
-  const where: {
-    status?: "PENDING" | "CONFIRMED" | "CANCELLED";
-    packageId?: string;
-    OR?: any;
-  } = {};
+  const where: Prisma.ReservationWhereInput = {};
   if (status === "PENDING" || status === "CONFIRMED" || status === "CANCELLED") {
     where.status = status;
   }
   if (packageId && /^[0-9a-f-]{36}$/i.test(packageId)) {
     where.packageId = packageId;
+  }
+  if (soldByUserId === "none") {
+    where.soldByUserId = null;
+  } else if (soldByUserId && /^[0-9a-f-]{36}$/i.test(soldByUserId)) {
+    where.soldByUserId = soldByUserId;
   }
   if (q) {
     where.OR = [
@@ -62,6 +65,7 @@ export async function GET(request: Request) {
     take: 400,
     include: {
       user: { select: { id: true, name: true, email: true } },
+      soldByUser: { select: { id: true, name: true, email: true, role: true } },
       package: { select: { id: true, name: true, slug: true, departureDate: true } },
     },
   });
@@ -81,11 +85,13 @@ export async function GET(request: Request) {
       totalPrice: r.totalPrice.toString(),
       discountAmount: r.discountAmount.toString(),
       totalDue: r.totalDue.toString(),
+      paymentStatus: r.paymentStatus,
       status: r.status,
       notes: r.notes,
       reservedAt: r.reservedAt.toISOString(),
       confirmedAt: r.confirmedAt?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
+      soldByUser: r.soldByUser,
       user: r.user,
       package: {
         ...r.package,
@@ -147,6 +153,7 @@ export async function POST(request: Request) {
       notes: d.notes ?? null,
       initialStatus: d.initialStatus,
       allowUnavailablePackage: true,
+      soldByUserId: auth.id,
     });
 
     const [pkg, settings, adminUsers] = await Promise.all([

@@ -17,7 +17,11 @@ export async function GET(request: Request) {
 
   const expiry = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const result = await prisma.reservation.updateMany({
-    where: { status: "PENDING", reservedAt: { lt: expiry } },
+    where: {
+      status: "PENDING",
+      paymentStatus: { not: "PAID" },
+      reservedAt: { lt: expiry },
+    },
     data: { status: "CANCELLED", confirmedAt: null },
   });
 
