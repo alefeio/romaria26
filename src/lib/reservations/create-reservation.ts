@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
-import type { Reservation, ReservationStatus } from "@/generated/prisma/client";
+import type { PrismaClient, Reservation, ReservationStatus } from "@/generated/prisma/client";
 import { ensureReservationVouchersTx } from "@/lib/vouchers/reservation-vouchers";
 
 /**
@@ -12,6 +12,38 @@ export const RESERVATION_STATUSES_THAT_OCCUPY_CAPACITY: ReservationStatus[] = [
   "PENDING",
   "CONFIRMED",
 ];
+
+type ExecuteRawClient = { $executeRaw: PrismaClient["$executeRaw"] };
+
+/**
+ * Cancela PENDING com mais de 24h. Compara `paymentStatus` via `::text` porque
+ * em alguns ambientes a coluna ainda é TEXT (não o enum Prisma), e `{ not: "PAID" }`
+ * gera `text <> ReservationPaymentStatus` no Postgres.
+ */
+export async function expireStalePendingReservations(
+  db: ExecuteRawClient,
+  opts?: { packageId?: string; olderThan?: Date }
+): Promise<number> {
+  const expiry = opts?.olderThan ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const packageId = opts?.packageId;
+  const updated = packageId
+    ? await db.$executeRaw`
+        UPDATE "Reservation"
+        SET status = 'CANCELLED', "confirmedAt" = NULL
+        WHERE status = 'PENDING'
+          AND "paymentStatus"::text <> 'PAID'
+          AND "reservedAt" < ${expiry}
+          AND "packageId" = ${packageId}
+      `
+    : await db.$executeRaw`
+        UPDATE "Reservation"
+        SET status = 'CANCELLED', "confirmedAt" = NULL
+        WHERE status = 'PENDING'
+          AND "paymentStatus"::text <> 'PAID'
+          AND "reservedAt" < ${expiry}
+      `;
+  return Number(updated);
+}
 
 export type CreateReservationInput = {
   packageId: string;
@@ -273,11 +305,7 @@ export async function createReservationInTransaction(
     `);
 
     // Regra: reservas pendentes seguram vaga por 24h; após isso, cancelam automaticamente.
-    const expiry = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    await tx.reservation.updateMany({
-      where: { packageId, status: "PENDING", paymentStatus: { not: "PAID" }, reservedAt: { lt: expiry } },
-      data: { status: "CANCELLED", confirmedAt: null },
-    });
+    await expireStalePendingReservations(tx, { packageId });
 
     const pkg = await tx.package.findUnique({
       where: { id: packageId },
@@ -436,11 +464,7 @@ export async function getPackageRemainingCapacity(
   }
 
   // Expirar pendentes antigos (24h) para devolver vaga automaticamente.
-  const expiry = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  await prisma.reservation.updateMany({
-    where: { packageId, status: "PENDING", paymentStatus: { not: "PAID" }, reservedAt: { lt: expiry } },
-    data: { status: "CANCELLED", confirmedAt: null },
-  });
+  await expireStalePendingReservations(prisma, { packageId });
 
   const agg = await prisma.reservation.aggregate({
     where: {

@@ -1,5 +1,6 @@
 import { jsonErr, jsonOk } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
+import { expireStalePendingReservations } from "@/lib/reservations/create-reservation";
 
 /**
  * Endpoint para cron: expira reservas PENDING com mais de 24h (vira CANCELLED).
@@ -15,16 +16,7 @@ export async function GET(request: Request) {
     return jsonErr("UNAUTHORIZED", "Cron secret inválido.", 401);
   }
 
-  const expiry = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const result = await prisma.reservation.updateMany({
-    where: {
-      status: "PENDING",
-      paymentStatus: { not: "PAID" },
-      reservedAt: { lt: expiry },
-    },
-    data: { status: "CANCELLED", confirmedAt: null },
-  });
+  const cancelled = await expireStalePendingReservations(prisma);
 
-  return jsonOk({ cancelled: result.count });
+  return jsonOk({ cancelled });
 }
-
