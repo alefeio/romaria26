@@ -60,10 +60,22 @@ export function templateAdminWelcome(params: {
   loginUrl?: string;
   /** URL absoluta da página “copiar senha” (token cifrado). */
   copyPasswordUrl: string;
+  /** Perfil criado: ADMIN (padrão) ou SELLER. */
+  role?: "ADMIN" | "SELLER";
 }): { subject: string; html: string } {
   const { name, email, tempPassword, copyPasswordUrl } = params;
+  const role = params.role === "SELLER" ? "SELLER" : "ADMIN";
   const loginUrl = params.loginUrl ?? getAppUrl("/login");
   const copyHref = escapeHtml(copyPasswordUrl);
+  const isSeller = role === "SELLER";
+  const title = isSeller ? "Acesso liberado — Balcão da vendedora" : "Acesso liberado — Área administrativa";
+  const subject = isSeller ? "Acesso liberado - Balcão da vendedora" : "Acesso liberado - Área administrativa";
+  const intro = isSeller
+    ? "Seu cadastro como <strong>vendedora do shopping</strong> foi realizado. Use os dados abaixo para acessar o balcão (cadastro de cliente, reserva e recebimento no stand):"
+    : "Seu cadastro na área administrativa foi realizado. Use os dados abaixo para acessar o sistema:";
+  const afterLogin = isSeller
+    ? `<p style="font-size:14px;color:#4b5563;margin:12px 0 0;">Após o login (e a troca de senha, se pedida), você será direcionada ao <strong>balcão</strong> para lançar vendas. Você não acessa faturamento nem o painel administrativo completo.</p>`
+    : "";
   const copyButton = `
 <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:20px 0;">
   <tr>
@@ -76,9 +88,9 @@ export function templateAdminWelcome(params: {
   </tr>
 </table>`;
   const body = `
-<h2 style="margin:0 0 12px;font-size:22px;color:#111827;">Acesso liberado — Área administrativa</h2>
+<h2 style="margin:0 0 12px;font-size:22px;color:#111827;">${title}</h2>
 <p>Olá, <strong>${escapeHtml(name)}</strong>.</p>
-<p>Seu cadastro na área administrativa foi realizado. Use os dados abaixo para acessar o sistema:</p>
+<p>${intro}</p>
 <ul style="padding-left:20px;margin:12px 0;">
   <li style="margin:6px 0;"><strong>Link de acesso:</strong> <a href="${escapeHtml(loginUrl)}">${escapeHtml(loginUrl)}</a></li>
   <li style="margin:6px 0;"><strong>Usuário (e-mail):</strong> ${escapeHtml(email)}</li>
@@ -95,9 +107,10 @@ export function templateAdminWelcome(params: {
 ${copyButton}
 <p style="font-size:13px;color:#6b7280;margin:0 0 16px;">O link do botão expira em <strong>72 horas</strong>. Se não abrir, copie e cole no navegador:<br/><a href="${copyHref}" style="word-break:break-all;color:#2563eb;">${copyHref}</a></p>
 <p><strong>Importante:</strong> por segurança, você deverá <strong>trocar a senha no primeiro acesso</strong>.</p>
+${afterLogin}
 <p style="font-size:13px;color:#6b7280;">Guarde esta mensagem em local seguro até alterar sua senha. Não compartilhe sua senha com ninguém.</p>
 `;
-  return { subject: "Acesso liberado - Área administrativa", html: wrapHtml(body) };
+  return { subject, html: wrapHtml(body) };
 }
 
 export function templateProfessorWelcome(params: {

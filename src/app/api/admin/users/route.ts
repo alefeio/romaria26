@@ -82,12 +82,13 @@ export async function POST(request: Request) {
 
   const tempPassword = generateTempPassword();
   const passwordHash = await hashPassword(tempPassword);
+  const createdRole = role === "SELLER" ? ("SELLER" as const) : ("ADMIN" as const);
   const created = await prisma.user.create({
     data: {
       name,
       email,
       passwordHash,
-      role: role === "SELLER" ? "SELLER" : "ADMIN",
+      role: createdRole,
       isActive: true,
       mustChangePassword: true,
     },
@@ -116,13 +117,15 @@ export async function POST(request: Request) {
     tempPassword,
     loginUrl,
     copyPasswordUrl,
+    role: createdRole,
   });
 
+  const emailType = createdRole === "SELLER" ? "welcome_seller" : "welcome_admin";
   const emailParams = {
     to: created.email,
     subject,
     html,
-    emailType: "welcome_admin" as const,
+    emailType,
     entityType: "User" as const,
     entityId: created.id,
     performedByUserId: actor.id,
@@ -136,7 +139,7 @@ export async function POST(request: Request) {
     entityType: "User",
     entityId: created.id,
     action: "EMAIL_SENT",
-    diff: { type: "welcome_admin", success: emailResult.success, messageId: emailResult.messageId },
+    diff: { type: emailType, success: emailResult.success, messageId: emailResult.messageId },
     performedByUserId: actor.id,
   });
 
@@ -144,7 +147,9 @@ export async function POST(request: Request) {
     {
       user: created,
       emailSent: emailResult.success,
-      ...(emailResult.success ? {} : { temporaryPassword: tempPassword }),
+      // Sempre devolve a senha ao criador para ele entregar se o e-mail falhar (ou confirmar o envio).
+      temporaryPassword: tempPassword,
+      loginUrl,
     },
     { status: 201 }
   );

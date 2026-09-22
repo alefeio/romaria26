@@ -183,32 +183,40 @@ export default function UsersPage() {
         body: JSON.stringify({ name, email, role: canCreateSeller ? createRole : "ADMIN" }),
       });
       const json = (await res.json()) as ApiResponse<{
-        user: { id: string };
+        user: { id: string; role?: string };
         emailSent?: boolean;
         temporaryPassword?: string;
+        loginUrl?: string;
         alreadyRegisteredAs?: string;
       }>;
       if (!res.ok || !json.ok) {
         toast.push("error", !json.ok ? json.error.message : "Falha ao criar usuário.");
         return;
       }
+      const isSeller = (canCreateSeller ? createRole : "ADMIN") === "SELLER";
+      const profileLabel = isSeller ? "Vendedora" : "Admin";
       if (json.data.alreadyRegisteredAs) {
         toast.push(
           "success",
           `Usuário já cadastrado como ${json.data.alreadyRegisteredAs}. Foi concedido acesso como Admin. Ao entrar no sistema, ele poderá escolher usar como ${json.data.alreadyRegisteredAs} ou Admin.`
         );
       } else if (json.data.emailSent) {
-        toast.push("success", "Admin criado. E-mail de acesso enviado para o novo usuário.");
+        toast.push(
+          "success",
+          `${profileLabel} criada(o). E-mail com link de acesso e senha temporária enviado para ${email.trim().toLowerCase()}.`
+        );
       } else {
         const senha = json.data.temporaryPassword ? ` Senha temporária: ${json.data.temporaryPassword}.` : "";
+        const link = json.data.loginUrl ? ` Link: ${json.data.loginUrl}.` : "";
         toast.push(
           "error",
-          `Admin criado, mas o e-mail não foi enviado. Passe o link de login e essa senha ao novo usuário.${senha}`
+          `${profileLabel} criada(o), mas o e-mail não foi enviado. Passe o acesso manualmente ao novo usuário.${link}${senha}`
         );
       }
       setOpen(false);
       setName("");
       setEmail("");
+      setCreateRole("ADMIN");
       await load();
     } finally {
       setSavingCreate(false);
