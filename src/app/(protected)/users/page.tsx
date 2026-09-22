@@ -39,7 +39,7 @@ function adminProfileLabel(u: AdminUser): string {
 export default function UsersPage() {
   const toast = useToast();
   const sessionUser = useUser();
-  const canCreateSeller = sessionUser.role === "MASTER";
+  const canCreateSeller = sessionUser.role === "MASTER" || sessionUser.role === "ADMIN";
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [showInactive, setShowInactive] = useState(false);

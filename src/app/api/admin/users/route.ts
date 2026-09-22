@@ -40,9 +40,6 @@ export async function POST(request: Request) {
   }
 
   const { name, email, role } = parsed.data;
-  if (role === "SELLER" && actor.role !== "MASTER") {
-    return jsonErr("FORBIDDEN", "Somente o Master pode criar vendedora.", 403);
-  }
 
   const existing = await prisma.user.findUnique({
     where: { email },
