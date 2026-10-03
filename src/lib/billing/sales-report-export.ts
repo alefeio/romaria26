@@ -208,6 +208,13 @@ export async function buildSalesReportPdf(data: SalesReportData): Promise<Uint8A
   drawPlain(`Periodo: ${periodLabel(data)}`, marginX, 9, false);
   y -= 12;
   drawPlain(`Gerado em: ${formatDateTimeBr(data.generatedAt)}`, marginX, 9, false);
+  y -= 12;
+  drawPlain(
+    `Kit cafe por ingresso: veja a tabela "Ingressos (vouchers)" (coluna Kit cafe). Total kits: ${data.totals.vouchers?.kits ?? 0}.`,
+    marginX,
+    8,
+    false
+  );
   y -= 16;
 
   // --- Resumo (compact table) ---
@@ -452,12 +459,17 @@ export async function buildSalesReportXlsx(data: SalesReportData): Promise<Buffe
   resumo.getCell("B2").value = periodLabel(data);
   resumo.getCell("A3").value = "Gerado em";
   resumo.getCell("B3").value = formatDateTimeBr(data.generatedAt);
+  resumo.getCell("A4").value = "Kit café por ingresso";
+  resumo.getCell("B4").value =
+    `Veja a aba "Ingressos" (coluna Kit café = Sim/Não). Total de kits: ${data.totals.vouchers?.kits ?? 0} · Ingressos listados: ${data.vouchers.length}`;
   resumo.getCell("A2").font = { bold: true };
   resumo.getCell("A3").font = { bold: true };
+  resumo.getCell("A4").font = { bold: true };
+  resumo.getCell("B4").font = { color: { argb: "FF1D4ED8" } };
 
   addNativeTable(resumo, {
     name: "TabelaResumo",
-    startRow: 5,
+    startRow: 6,
     headers: ["Indicador", "Valor"],
     rows: [
       ["Reservas (não canceladas)", data.totals.reservationsCount],
@@ -465,7 +477,7 @@ export async function buildSalesReportXlsx(data: SalesReportData): Promise<Buffe
       ["Vouchers — adultos", data.totals.vouchers?.adults ?? 0],
       ["Vouchers — crianças pagas (≥ 6 anos)", data.totals.vouchers?.paidChildren ?? 0],
       ["Vouchers — crianças não pagas (< 6 / cortesia)", data.totals.vouchers?.unpaidChildren ?? 0],
-      ["Kits café da manhã", data.totals.vouchers?.kits ?? 0],
+      ["Kits café da manhã (qtd de ingressos com kit)", data.totals.vouchers?.kits ?? 0],
       [
         "Camisas opcionais (crianças gratuitas)",
         `${data.totals.vouchers?.optionalShirts ?? 0} / ${Number(data.totals.vouchers?.optionalShirtsAmount ?? 0)}`,
@@ -481,12 +493,45 @@ export async function buildSalesReportXlsx(data: SalesReportData): Promise<Buffe
       ["Parcelas em atraso (valor)", Number(data.totals.overdueAmount)],
     ],
   });
-  // Formatar valores monetários do resumo (linhas de dados da tabela)
-  for (const r of [12, 13, 14, 15, 16, 18, 20]) {
+  // Formatar valores monetários do resumo (linhas de dados da tabela; tabela começa na linha 6)
+  for (const r of [13, 14, 15, 16, 17, 19, 21]) {
     resumo.getCell(`B${r}`).numFmt = '"R$"#,##0.00';
   }
-  // Congelar só o título no resumo (tabela começa na linha 5)
-  resumo.views = [{ state: "frozen", ySplit: 4 }];
+  // Congelar só o título no resumo (tabela começa na linha 6)
+  resumo.views = [{ state: "frozen", ySplit: 5 }];
+
+  // Aba Ingressos logo após Resumo (kit café por voucher — onde a informação fica detalhada).
+  const ingressos = wb.addWorksheet("Ingressos", { properties: { defaultRowHeight: 18 } });
+  addNativeTable(ingressos, {
+    name: "TabelaIngressos",
+    startRow: 1,
+    headers: [
+      "Código",
+      "Nome no ingresso",
+      "Tipo",
+      "Kit café",
+      "Camisa",
+      "Cliente",
+      "Pacote",
+      "Saída",
+      "Data reserva",
+      "ID reserva",
+      "ID voucher",
+    ],
+    rows: data.vouchers.map((v) => [
+      v.code,
+      v.name,
+      v.personType === "CHILD" ? "Criança" : "Adulto",
+      v.personType === "ADULT" ? (v.hasBreakfastKit ? "Sim" : "Não") : "—",
+      v.shirtSize,
+      v.customerName,
+      v.packageName,
+      v.packageDepartureDate,
+      formatDateTimeBr(v.reservedAt),
+      v.reservationId,
+      v.id,
+    ]),
+  });
 
   const vendas = wb.addWorksheet("Vendas", { properties: { defaultRowHeight: 18 } });
   addNativeTable(vendas, {
@@ -529,38 +574,6 @@ export async function buildSalesReportXlsx(data: SalesReportData): Promise<Buffe
       r.id,
     ]),
     moneyCols: [12, 13, 14],
-  });
-
-  const ingressos = wb.addWorksheet("Ingressos", { properties: { defaultRowHeight: 18 } });
-  addNativeTable(ingressos, {
-    name: "TabelaIngressos",
-    startRow: 1,
-    headers: [
-      "Código",
-      "Nome no ingresso",
-      "Tipo",
-      "Kit café",
-      "Camisa",
-      "Cliente",
-      "Pacote",
-      "Saída",
-      "Data reserva",
-      "ID reserva",
-      "ID voucher",
-    ],
-    rows: data.vouchers.map((v) => [
-      v.code,
-      v.name,
-      v.personType === "CHILD" ? "Criança" : "Adulto",
-      v.personType === "ADULT" ? (v.hasBreakfastKit ? "Sim" : "Não") : "—",
-      v.shirtSize,
-      v.customerName,
-      v.packageName,
-      v.packageDepartureDate,
-      formatDateTimeBr(v.reservedAt),
-      v.reservationId,
-      v.id,
-    ]),
   });
 
   const pagamentos = wb.addWorksheet("Pagamentos", { properties: { defaultRowHeight: 18 } });
