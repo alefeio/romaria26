@@ -42,10 +42,13 @@ type TableColumn = {
 
 type TableRow = Record<string, string>;
 
-function kitCafeLabel(r: { includesBreakfastKit: boolean; breakfastKitCount: number }): string {
-  if (!r.includesBreakfastKit || r.breakfastKitCount <= 0) return "Nao";
-  if (r.breakfastKitCount === 1) return "Sim";
-  return `Sim (${r.breakfastKitCount})`;
+function voucherKitLabel(v: { personType: string; hasBreakfastKit: boolean }): string {
+  if (v.personType !== "ADULT") return "-";
+  return v.hasBreakfastKit ? "Sim" : "Nao";
+}
+
+function personTypeLabel(personType: string): string {
+  return personType === "CHILD" ? "Crianca" : "Adulto";
 }
 
 export async function buildSalesReportPdf(data: SalesReportData): Promise<Uint8Array> {
@@ -245,16 +248,15 @@ export async function buildSalesReportPdf(data: SalesReportData): Promise<Uint8A
   drawTable(
     "Vendas (reservas)",
     [
-      { key: "data", label: "Data", width: 1.25 },
-      { key: "cliente", label: "Cliente", width: 2.0 },
-      { key: "pacote", label: "Pacote", width: 1.9 },
-      { key: "saida", label: "Saida", width: 0.85 },
-      { key: "qtd", label: "Qtd", width: 0.4, align: "right" },
-      { key: "kit", label: "Kit cafe", width: 0.7, align: "center" },
-      { key: "devido", label: "Devido", width: 0.95, align: "right" },
-      { key: "pago", label: "Pago", width: 0.95, align: "right" },
-      { key: "receber", label: "A receber", width: 0.95, align: "right" },
-      { key: "status", label: "Status", width: 0.8, align: "center" },
+      { key: "data", label: "Data", width: 1.35 },
+      { key: "cliente", label: "Cliente", width: 2.2 },
+      { key: "pacote", label: "Pacote", width: 2.1 },
+      { key: "saida", label: "Saida", width: 0.9 },
+      { key: "qtd", label: "Qtd", width: 0.45, align: "right" },
+      { key: "devido", label: "Devido", width: 1.0, align: "right" },
+      { key: "pago", label: "Pago", width: 1.0, align: "right" },
+      { key: "receber", label: "A receber", width: 1.0, align: "right" },
+      { key: "status", label: "Status", width: 0.85, align: "center" },
     ],
     data.reservations.map((r) => ({
       data: formatDateTimeBr(r.reservedAt),
@@ -262,13 +264,37 @@ export async function buildSalesReportPdf(data: SalesReportData): Promise<Uint8A
       pacote: r.packageName,
       saida: r.packageDepartureDate,
       qtd: String(r.quantity),
-      kit: kitCafeLabel(r),
       devido: formatBrl(r.totalDue),
       pago: formatBrl(r.totalPaid),
       receber: formatBrl(r.toReceive),
       status: r.paymentStatus,
     })),
     "Nenhuma reserva no periodo."
+  );
+
+  drawTable(
+    "Ingressos (vouchers)",
+    [
+      { key: "codigo", label: "Codigo", width: 0.85, align: "center" },
+      { key: "nome", label: "Nome no ingresso", width: 2.2 },
+      { key: "tipo", label: "Tipo", width: 0.8, align: "center" },
+      { key: "kit", label: "Kit cafe", width: 0.75, align: "center" },
+      { key: "camisa", label: "Camisa", width: 0.7, align: "center" },
+      { key: "cliente", label: "Cliente", width: 1.9 },
+      { key: "pacote", label: "Pacote", width: 1.9 },
+      { key: "saida", label: "Saida", width: 0.9 },
+    ],
+    data.vouchers.map((v) => ({
+      codigo: v.code,
+      nome: v.name,
+      tipo: personTypeLabel(v.personType),
+      kit: voucherKitLabel(v),
+      camisa: v.shirtSize,
+      cliente: v.customerName,
+      pacote: v.packageName,
+      saida: v.packageDepartureDate,
+    })),
+    "Nenhum ingresso/voucher no periodo."
   );
 
   drawTable(
@@ -476,8 +502,6 @@ export async function buildSalesReportXlsx(data: SalesReportData): Promise<Buffe
       "Adultos",
       "Crianças",
       "Qtd",
-      "Kit café incluso",
-      "Qtd kits café",
       "Status reserva",
       "Status pagamento",
       "Devido",
@@ -496,8 +520,6 @@ export async function buildSalesReportXlsx(data: SalesReportData): Promise<Buffe
       r.adultsCount,
       r.childrenCount,
       r.quantity,
-      r.includesBreakfastKit ? "Sim" : "Não",
-      r.breakfastKitCount,
       r.status,
       r.paymentStatus,
       Number(r.totalDue),
@@ -506,7 +528,39 @@ export async function buildSalesReportXlsx(data: SalesReportData): Promise<Buffe
       r.paymentPreferenceMethod ?? "",
       r.id,
     ]),
-    moneyCols: [14, 15, 16],
+    moneyCols: [12, 13, 14],
+  });
+
+  const ingressos = wb.addWorksheet("Ingressos", { properties: { defaultRowHeight: 18 } });
+  addNativeTable(ingressos, {
+    name: "TabelaIngressos",
+    startRow: 1,
+    headers: [
+      "Código",
+      "Nome no ingresso",
+      "Tipo",
+      "Kit café",
+      "Camisa",
+      "Cliente",
+      "Pacote",
+      "Saída",
+      "Data reserva",
+      "ID reserva",
+      "ID voucher",
+    ],
+    rows: data.vouchers.map((v) => [
+      v.code,
+      v.name,
+      v.personType === "CHILD" ? "Criança" : "Adulto",
+      v.personType === "ADULT" ? (v.hasBreakfastKit ? "Sim" : "Não") : "—",
+      v.shirtSize,
+      v.customerName,
+      v.packageName,
+      v.packageDepartureDate,
+      formatDateTimeBr(v.reservedAt),
+      v.reservationId,
+      v.id,
+    ]),
   });
 
   const pagamentos = wb.addWorksheet("Pagamentos", { properties: { defaultRowHeight: 18 } });

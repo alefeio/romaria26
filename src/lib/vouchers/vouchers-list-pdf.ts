@@ -89,7 +89,7 @@ export async function buildVouchersListPdf(opts: {
 
     for (const r of rows) {
       const kitLabel =
-        r.personType === "ADULT" ? (r.hasBreakfastKit ? "Sim" : "Nao") : "—";
+        r.personType === "ADULT" ? (r.hasBreakfastKit ? "Sim" : "Nao") : "-";
       const text = `${r.name}  •  Camisa: ${r.shirtSize}  •  Kit cafe: ${kitLabel}  •  Codigo: ${r.code}`;
       drawTextLine(text, { size: 10, font, color: rgb(0, 0, 0), gapAfter: smallLineH + 2 });
     }

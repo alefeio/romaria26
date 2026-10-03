@@ -28,16 +28,27 @@ export type SalesReportReservation = {
   adultsCount: number;
   childrenCount: number;
   quantity: number;
-  /** Quantidade de kits café marcados na reserva (adultos). */
-  breakfastKitCount: number;
-  /** true se há ao menos um kit café incluso. */
-  includesBreakfastKit: boolean;
   status: string;
   paymentStatus: string;
   totalDue: string;
   totalPaid: string;
   toReceive: string;
   paymentPreferenceMethod: string | null;
+};
+
+/** Um ingresso/voucher da reserva (kit café é por voucher, não por reserva). */
+export type SalesReportVoucher = {
+  id: string;
+  code: string;
+  name: string;
+  personType: "ADULT" | "CHILD";
+  shirtSize: string;
+  hasBreakfastKit: boolean;
+  customerName: string;
+  packageName: string;
+  packageDepartureDate: string;
+  reservationId: string;
+  reservedAt: string;
 };
 
 export type SalesReportPayment = {
@@ -81,6 +92,8 @@ export type SalesReportData = {
     vouchers: BillingVoucherStats;
   };
   reservations: SalesReportReservation[];
+  /** Ingressos/vouchers das reservas do período (kit café por voucher). */
+  vouchers: SalesReportVoucher[];
   payments: SalesReportPayment[];
   overdue: SalesReportOverdue[];
 };
@@ -124,7 +137,7 @@ export async function loadSalesReportData(opts: {
   const now = new Date();
   const todayStart = new Date(ymdUtc(now) + "T00:00:00.000Z");
 
-  const [reservations, payments, overdueInstallments, agg, vouchers] = await Promise.all([
+  const [reservations, payments, overdueInstallments, agg, voucherStats, voucherRows] = await Promise.all([
     prisma.reservation.findMany({
       where: baseWhere,
       orderBy: [{ reservedAt: "desc" }],
@@ -177,6 +190,30 @@ export async function loadSalesReportData(opts: {
       _count: { _all: true },
     }),
     loadBillingVoucherStats(baseWhere).catch(() => EMPTY_VOUCHER_STATS),
+    prisma.reservationVoucher.findMany({
+      where: {
+        voidedAt: null,
+        reservation: baseWhere,
+      },
+      orderBy: [{ code: "asc" }],
+      take: 20_000,
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        personType: true,
+        shirtSize: true,
+        hasBreakfastKit: true,
+        reservationId: true,
+        reservation: {
+          select: {
+            customerNameSnapshot: true,
+            reservedAt: true,
+            package: { select: { name: true, departureDate: true } },
+          },
+        },
+      },
+    }),
   ]);
 
   const sumPrice = new Prisma.Decimal(money(agg._sum.totalPrice));
@@ -203,16 +240,11 @@ export async function loadSalesReportData(opts: {
       paymentsAmount: paymentsAmount.toString(),
       overdueCount: overdueInstallments.length,
       overdueAmount: overdueAmount.toString(),
-      vouchers,
+      vouchers: voucherStats,
     },
     reservations: reservations.map((r) => {
       const due = new Prisma.Decimal(money(r.totalDue));
       const paid = new Prisma.Decimal(money(r.totalPaid));
-      const breakfastKitCount = Array.isArray(r.breakfastKitSelections)
-        ? r.breakfastKitSelections.filter(Boolean).length
-        : r.includesBreakfastKit
-          ? 1
-          : 0;
       return {
         id: r.id,
         reservedAt: r.reservedAt.toISOString(),
@@ -224,8 +256,6 @@ export async function loadSalesReportData(opts: {
         adultsCount: r.adultsCount,
         childrenCount: r.childrenCount,
         quantity: r.quantity,
-        breakfastKitCount,
-        includesBreakfastKit: breakfastKitCount > 0 || Boolean(r.includesBreakfastKit),
         status: r.status,
         paymentStatus: r.paymentStatus,
         totalDue: due.toString(),
@@ -234,6 +264,19 @@ export async function loadSalesReportData(opts: {
         paymentPreferenceMethod: r.paymentPreferenceMethod,
       };
     }),
+    vouchers: voucherRows.map((v) => ({
+      id: v.id,
+      code: v.code,
+      name: v.name,
+      personType: v.personType,
+      shirtSize: v.shirtSize,
+      hasBreakfastKit: v.personType === "ADULT" ? Boolean(v.hasBreakfastKit) : false,
+      customerName: v.reservation.customerNameSnapshot,
+      packageName: v.reservation.package.name,
+      packageDepartureDate: v.reservation.package.departureDate.toISOString().slice(0, 10),
+      reservationId: v.reservationId,
+      reservedAt: v.reservation.reservedAt.toISOString(),
+    })),
     payments: payments.map((p) => ({
       id: p.id,
       paidAt: p.paidAt.toISOString(),
