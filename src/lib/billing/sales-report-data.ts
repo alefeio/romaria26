@@ -28,6 +28,10 @@ export type SalesReportReservation = {
   adultsCount: number;
   childrenCount: number;
   quantity: number;
+  /** Quantidade de kits café marcados na reserva (adultos). */
+  breakfastKitCount: number;
+  /** true se há ao menos um kit café incluso. */
+  includesBreakfastKit: boolean;
   status: string;
   paymentStatus: string;
   totalDue: string;
@@ -204,6 +208,11 @@ export async function loadSalesReportData(opts: {
     reservations: reservations.map((r) => {
       const due = new Prisma.Decimal(money(r.totalDue));
       const paid = new Prisma.Decimal(money(r.totalPaid));
+      const breakfastKitCount = Array.isArray(r.breakfastKitSelections)
+        ? r.breakfastKitSelections.filter(Boolean).length
+        : r.includesBreakfastKit
+          ? 1
+          : 0;
       return {
         id: r.id,
         reservedAt: r.reservedAt.toISOString(),
@@ -215,6 +224,8 @@ export async function loadSalesReportData(opts: {
         adultsCount: r.adultsCount,
         childrenCount: r.childrenCount,
         quantity: r.quantity,
+        breakfastKitCount,
+        includesBreakfastKit: breakfastKitCount > 0 || Boolean(r.includesBreakfastKit),
         status: r.status,
         paymentStatus: r.paymentStatus,
         totalDue: due.toString(),

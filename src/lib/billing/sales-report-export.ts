@@ -42,6 +42,12 @@ type TableColumn = {
 
 type TableRow = Record<string, string>;
 
+function kitCafeLabel(r: { includesBreakfastKit: boolean; breakfastKitCount: number }): string {
+  if (!r.includesBreakfastKit || r.breakfastKitCount <= 0) return "Nao";
+  if (r.breakfastKitCount === 1) return "Sim";
+  return `Sim (${r.breakfastKitCount})`;
+}
+
 export async function buildSalesReportPdf(data: SalesReportData): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -239,15 +245,16 @@ export async function buildSalesReportPdf(data: SalesReportData): Promise<Uint8A
   drawTable(
     "Vendas (reservas)",
     [
-      { key: "data", label: "Data", width: 1.35 },
-      { key: "cliente", label: "Cliente", width: 2.2 },
-      { key: "pacote", label: "Pacote", width: 2.1 },
-      { key: "saida", label: "Saida", width: 0.9 },
-      { key: "qtd", label: "Qtd", width: 0.45, align: "right" },
-      { key: "devido", label: "Devido", width: 1.0, align: "right" },
-      { key: "pago", label: "Pago", width: 1.0, align: "right" },
-      { key: "receber", label: "A receber", width: 1.0, align: "right" },
-      { key: "status", label: "Status", width: 0.85, align: "center" },
+      { key: "data", label: "Data", width: 1.25 },
+      { key: "cliente", label: "Cliente", width: 2.0 },
+      { key: "pacote", label: "Pacote", width: 1.9 },
+      { key: "saida", label: "Saida", width: 0.85 },
+      { key: "qtd", label: "Qtd", width: 0.4, align: "right" },
+      { key: "kit", label: "Kit cafe", width: 0.7, align: "center" },
+      { key: "devido", label: "Devido", width: 0.95, align: "right" },
+      { key: "pago", label: "Pago", width: 0.95, align: "right" },
+      { key: "receber", label: "A receber", width: 0.95, align: "right" },
+      { key: "status", label: "Status", width: 0.8, align: "center" },
     ],
     data.reservations.map((r) => ({
       data: formatDateTimeBr(r.reservedAt),
@@ -255,6 +262,7 @@ export async function buildSalesReportPdf(data: SalesReportData): Promise<Uint8A
       pacote: r.packageName,
       saida: r.packageDepartureDate,
       qtd: String(r.quantity),
+      kit: kitCafeLabel(r),
       devido: formatBrl(r.totalDue),
       pago: formatBrl(r.totalPaid),
       receber: formatBrl(r.toReceive),
@@ -468,6 +476,8 @@ export async function buildSalesReportXlsx(data: SalesReportData): Promise<Buffe
       "Adultos",
       "Crianças",
       "Qtd",
+      "Kit café incluso",
+      "Qtd kits café",
       "Status reserva",
       "Status pagamento",
       "Devido",
@@ -486,6 +496,8 @@ export async function buildSalesReportXlsx(data: SalesReportData): Promise<Buffe
       r.adultsCount,
       r.childrenCount,
       r.quantity,
+      r.includesBreakfastKit ? "Sim" : "Não",
+      r.breakfastKitCount,
       r.status,
       r.paymentStatus,
       Number(r.totalDue),
@@ -494,7 +506,7 @@ export async function buildSalesReportXlsx(data: SalesReportData): Promise<Buffe
       r.paymentPreferenceMethod ?? "",
       r.id,
     ]),
-    moneyCols: [12, 13, 14],
+    moneyCols: [14, 15, 16],
   });
 
   const pagamentos = wb.addWorksheet("Pagamentos", { properties: { defaultRowHeight: 18 } });
