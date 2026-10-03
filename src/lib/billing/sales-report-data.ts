@@ -28,6 +28,12 @@ export type SalesReportReservation = {
   adultsCount: number;
   childrenCount: number;
   quantity: number;
+  /** Adultos com kit café (contagem a partir dos vouchers). */
+  adultsWithKitCount: number;
+  /** Adultos sem kit café. */
+  adultsWithoutKitCount: number;
+  /** Resumo: Com kit | Sem kit | Misto | - */
+  kitCafeLabel: string;
   status: string;
   paymentStatus: string;
   totalDue: string;
@@ -223,6 +229,15 @@ export async function loadSalesReportData(opts: {
   const paymentsAmount = payments.reduce((acc, p) => acc.add(p.amount), new Prisma.Decimal(0));
   const overdueAmount = overdueInstallments.reduce((acc, i) => acc.add(i.amount), new Prisma.Decimal(0));
 
+  const kitCountsByReservation = new Map<string, { withKit: number; withoutKit: number }>();
+  for (const v of voucherRows) {
+    if (v.personType !== "ADULT") continue;
+    const curr = kitCountsByReservation.get(v.reservationId) ?? { withKit: 0, withoutKit: 0 };
+    if (v.hasBreakfastKit) curr.withKit += 1;
+    else curr.withoutKit += 1;
+    kitCountsByReservation.set(v.reservationId, curr);
+  }
+
   return {
     generatedAt: now.toISOString(),
     range: {
@@ -245,6 +260,17 @@ export async function loadSalesReportData(opts: {
     reservations: reservations.map((r) => {
       const due = new Prisma.Decimal(money(r.totalDue));
       const paid = new Prisma.Decimal(money(r.totalPaid));
+      const fromVouchers = kitCountsByReservation.get(r.id);
+      let adultsWithKitCount = fromVouchers?.withKit ?? 0;
+      let adultsWithoutKitCount = fromVouchers?.withoutKit ?? 0;
+      if (!fromVouchers && Array.isArray(r.breakfastKitSelections) && r.breakfastKitSelections.length > 0) {
+        adultsWithKitCount = r.breakfastKitSelections.filter(Boolean).length;
+        adultsWithoutKitCount = Math.max(0, r.adultsCount - adultsWithKitCount);
+      }
+      let kitCafeLabel = "-";
+      if (adultsWithKitCount > 0 && adultsWithoutKitCount > 0) kitCafeLabel = "Misto";
+      else if (adultsWithKitCount > 0) kitCafeLabel = "Com kit";
+      else if (adultsWithoutKitCount > 0 || r.adultsCount > 0) kitCafeLabel = "Sem kit";
       return {
         id: r.id,
         reservedAt: r.reservedAt.toISOString(),
@@ -256,6 +282,9 @@ export async function loadSalesReportData(opts: {
         adultsCount: r.adultsCount,
         childrenCount: r.childrenCount,
         quantity: r.quantity,
+        adultsWithKitCount,
+        adultsWithoutKitCount,
+        kitCafeLabel,
         status: r.status,
         paymentStatus: r.paymentStatus,
         totalDue: due.toString(),
