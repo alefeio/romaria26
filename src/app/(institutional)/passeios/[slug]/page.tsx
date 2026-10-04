@@ -61,13 +61,6 @@ export default async function PasseioDetalhePage({ params }: Props) {
               Kit café opcional: {formatBrl(pkg.breakfastKitPrice)} por pessoa
             </p>
           ) : null}
-          <p className="mt-2 text-sm text-[var(--igh-secondary)]">
-            {pkg.remainingPlaces === null
-              ? "Vagas: consulte a equipe"
-              : pkg.remainingPlaces <= 0
-                ? "Esgotado"
-                : `${pkg.remainingPlaces} vagas disponíveis`}
-          </p>
 
           {gallery.length > 0 ? (
             <div className="mt-8">

@@ -11,7 +11,6 @@ export type PackageCardProps = {
   departureTime: string;
   boardingLocation: string;
   coverImageUrl: string | null;
-  remainingPlaces: number | null;
   status: "DRAFT" | "SOON" | "OPEN" | "SOLD_OUT" | "CLOSED";
 };
 
@@ -22,17 +21,6 @@ function formatBrl(value: string): string {
 }
 
 export function PackageCard(p: PackageCardProps) {
-  const vagas =
-    p.status === "CLOSED"
-      ? "Encerrado"
-      : p.status === "SOON"
-        ? "Em breve"
-        : p.remainingPlaces === null
-          ? "—"
-          : p.remainingPlaces <= 0
-            ? "Esgotado"
-            : `${p.remainingPlaces} vagas`;
-
   const canOpenDetails = p.status === "OPEN" || p.status === "SOLD_OUT";
   const buttonLabel =
     p.status === "SOON"
@@ -86,10 +74,6 @@ export function PackageCard(p: PackageCardProps) {
           <li>
             <span className="text-[var(--igh-muted)]">A partir de: </span>
             <span className="font-semibold text-[var(--igh-primary)]">{formatBrl(p.price)}</span>
-          </li>
-          <li>
-            <span className="text-[var(--igh-muted)]">Vagas: </span>
-            {vagas}
           </li>
         </ul>
         <div className="mt-auto pt-4">

@@ -35,7 +35,6 @@ export default async function PasseiosPage() {
                 departureTime={p.departureTime}
                 boardingLocation={p.boardingLocation}
                 coverImageUrl={p.coverImageUrl}
-                remainingPlaces={p.remainingPlaces}
                 status={p.status}
               />
             </li>
